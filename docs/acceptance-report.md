@@ -21,10 +21,12 @@
 | 包 | 用例数 | 覆盖的行为边界 | 结果 |
 | --- | --- | --- | --- |
 | `@mcmodkit/core` | 14 | Spec 校验与字段级报错、id 风格转换、模板渲染、生成计划（重复 id/路径守卫）、幂等落盘、外来文件不被触碰、错误码信封 | ✅ |
-| `@mcmodkit/adapters` | 10 | 适配器加载/校验/lint、资产解析、真实适配器契约（wrapper 资产、单数数据包目录、Java 源码位置、创造模式标签路由）、模板不得硬编码 MC 版本 | ✅ |
+| `@mcmodkit/adapters` | 11 | 适配器加载/校验/lint、资产解析、真实适配器契约（wrapper 资产、单数数据包目录、Java 源码位置、创造模式标签路由）、模板不得硬编码 MC 版本、**所有适配器生成结果零残留占位符**（无法编译验证的适配器的关键防线） | ✅ |
 | `@mcmodkit/cli` | 4 | 参数解析、stdin/文件输入、退出码映射、`--json` 信封 | ✅ |
 | `@mcmodkit/mcp-server` | 6 | 工具定义与 `callTool` 分发、错误信封 | ✅ |
 | `@mcmodkit/api` | 6 | 路由与状态码（200/400/404/500）、信封结构 | ✅ |
+
+最终回归（清理 `Temp/` 后重跑）：**41 passed / 0 failed**（core 14 · adapters 11 · cli 4 · mcp 6 · api 6），`pnpm -r build`（含 `tsc --noEmit`）无错误。
 
 ## 3. L3 集成：三个智能体接入面
 
