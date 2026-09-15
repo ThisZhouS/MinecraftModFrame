@@ -67,6 +67,53 @@ out/my-mod/
 
 贴图（16×16 PNG）不生成，生成工程的 README 会明确列出需要自备的文件。
 
+## 接给智能体 / Wiring an agent
+
+### MCP（stdio，推荐）
+
+先在仓库根目录 `pnpm install && pnpm -r build`，然后让 MCP 客户端启动 `packages/mcp-server/dist/index.js`：
+
+```json
+{
+  "mcpServers": {
+    "mcmodkit": {
+      "command": "node",
+      "args": ["E:/MCMOD/packages/mcp-server/dist/index.js"]
+    }
+  }
+}
+```
+
+Codex（`~/.codex/config.toml`）：
+
+```toml
+[mcp_servers.mcmodkit]
+command = "node"
+args = ["E:/MCMOD/packages/mcp-server/dist/index.js"]
+```
+
+Claude Code：`claude mcp add mcmodkit -- node E:/MCMOD/packages/mcp-server/dist/index.js`（或写入同样的 `mcpServers` 配置）。
+
+任何 stdio MCP 客户端（含 DeepSeek Harness）都能用同一份配置接入，因为服务端只依赖标准输入输出，不绑定特定宿主。
+
+### 智能体典型调用序列
+
+```
+list_versions  → 选定 (mcVersion, loader)
+example_spec   → 拿到可用的 Spec 骨架
+validate_spec  → 按字段级报错修正（无需读文档）
+scaffold_mod   → dryRun 看文件计划 → 真实生成到指定目录
+```
+
+生成后由智能体（或人类）在目标目录执行 `gradlew build`；**MCP 面不执行任何 shell 命令**，以免把任意命令执行暴露给模型。
+
+### CLI 与 HTTP
+
+```bash
+node packages/cli/dist/index.js --help          # 子命令与退出码语义
+MCMODKIT_API_PORT=7431 node packages/api/dist/index.js   # 仅监听 loopback
+```
+
 ## 仓库结构
 
 | 路径 | 作用 |
