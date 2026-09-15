@@ -38,7 +38,7 @@
 | NFR-4 | 可扩展：新增 (版本 × 加载器) 只需新增一个 JSON 数据文件，不改引擎代码 | 适配器契约 + `lintAdapter` 守卫 |
 | NFR-5 | 原则守卫：引擎代码不得出现版本分支，模板不得硬编码 MC 版本 | `packages/adapters/test/real-adapter.test.ts` 的 hygiene 测试 |
 | NFR-6 | 跨平台：Windows 优先，路径一律 posix 相对路径 + Node path 转换 | 在 Windows 11 + Node 24 实测 |
-| NFR-7 | 许可证合规：自研代码 MIT；仅复用可再分发资产并记录来源 | `packages/adapters/assets/gradle-9.5.1/PROVENANCE.md` |
+| NFR-7 | 许可证合规：自研代码 MIT；仅复用可再分发资产并记录来源 | `packages/adapters/assets/gradle-9.5.1/PROVENANCE.md`、`packages/adapters/assets/gradle-8.8/PROVENANCE.md`（Forge 线因 ForgeGradle 6 不兼容 Gradle 9 而独立携带 8.8 wrapper） |
 
 ## 4. 明确不做（本期）
 
@@ -50,6 +50,6 @@
 
 ## 5. 待定问题（需用户决策）
 
-1. 首发是否同时提供 NeoForge 1.21.1 适配器（本机可编译验证）？Forge 1.20.1 是否作为「仅生成」目标进入？
+1. ~~首发是否同时提供 NeoForge 1.21.1 适配器？Forge 1.20.1 是否作为「仅生成」目标进入？~~ **已决**：三个适配器全部提供（fabric-1.21.1 / neoforge-1.21.1 / forge-1.20.1）；其中 Fabric 与 Forge 已真编译验证，Forge 1.20.1 **不是**「仅生成」（经 Adoptium JDK 17 实测可编译），NeoForge 因网络阻塞暂为「未编译验证」。
 2. HTTP API 是否需要 token 鉴权（当前默认 127.0.0.1、无鉴权）？
 3. 默认命名空间与包名推导规则（当前：`modId` 即命名空间，包名默认 `com.<modId>`）。

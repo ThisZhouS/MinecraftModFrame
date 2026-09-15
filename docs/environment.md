@@ -69,3 +69,17 @@ Get-Command node,npm,pnpm,python,git,java,gradle,mvn,docker | Format-Table Sourc
 
 5. 生成的 mod 工程要能在「部分域名不可达」的网络下工作：仓库顺序把可达镜像放前、官方 maven 放后（不可达仓库会导致 Gradle 硬失败）。
 6. 构建验收要区分「模板缺陷」与「网络阻断」：前者必须修复模板，后者记为阻塞并保留证据，不得混同为通过或失败。
+## 追加实测（本轮，Forge 1.20.1 编译验证）
+
+| 目标 | curl.exe | Java(JDK 17/21) | 影响 |
+| --- | --- | --- | --- |
+| `maven.minecraftforge.net`（Forge 官方 maven） | ✅ 200 | ✅ 200（实测拉取 userdev jar 3 MB） | Forge 线**可完整编译验证** |
+| `api.adoptium.net` → GitHub release assets | ✅ | — | 可取得 Temurin **JDK 17.0.20.1**（本机因此具备 Java 17 编译能力） |
+| `github.com` | ❌ 连接超时（本轮重下 Gradle 9.5.1 时失败） | — | `services.gradle.org` 的部分发行版重定向到 GitHub ⇒ 重下 Gradle 可能失败；应保留本地发行版副本 |
+| `maven.neoforged.net` | ⚠️ 连接重置 | ❌ SSL 握手终止 | NeoForge 线仍阻塞（见验收报告 §7.1） |
+
+### 本轮取得的工具链（临时，位于 Temp/tools，不入库）
+
+- Temurin `jdk-17.0.20.1+1`（`api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jdk/hotspot/normal/eclipse`）
+- Gradle `8.8`（Forge 线必需；ForgeGradle 6 拒绝 Gradle 9）与 Gradle `9.5.1`（Fabric 线；本轮重下受 github.com 阻塞，需保留副本）
+- 生成工程的构建缓存位于 `%USERPROFILE%\.gradle\caches\forge_gradle`（Forge 线首次构建约 385 MB）

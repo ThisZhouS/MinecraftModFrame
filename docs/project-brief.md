@@ -65,5 +65,7 @@
 | 2026-09-15 | 修正"Forge 止于 1.20.1"的错误前提 | 调研 C（docs/research/2026-09-version-api-knowledge.md §0）：Forge 仍发布（1.21.1→52.1.16、26.2→65.1.3），分水岭是 NeoForge 1.20.2 的 API 断裂 | 沿用旧前提 | 已修正 |
 | 2026-09-15 | adapter 一律以 **Mojang 官方映射（Mojmap）** 生成 | Mojang 已去混淆；Fabric 官方 2025-10-31 宣布停维 Yarn 并迁至 Mojmap（26.1+ 无 Yarn），mojmap 无需按版本钉住映射版本字符串 | Yarn（需按版本维护映射版本号） | 已采纳 |
 | 2026-09-15 | 首发适配器 = Fabric 1.21.1 + NeoForge 1.21.1（Java 21） | environment.md：本机仅 JDK21，这两个目标可**编译级验证**；1.20.1（Java 17）降级为"仅生成、受限验证" | 先做 1.20.1 | 已采纳 |
+| 2026-09-15 | 追加 Forge 1.20.1 适配器，**并推翻"1.20.1 只能生成"的前提** | 实测：Adoptium 可下载 Temurin JDK 17（api.adoptium.net 可达）、`maven.minecraftforge.net` 本机可达（与 NeoForged 相反），因此 1.20.1 也能做**编译级验证**；官方 47.4.10 MDK 给出权威事实（ForgeGradle `[6.0,6.2)`、Gradle wrapper 8.8、Java 17、`META-INF/mods.toml`、pack_format 15、1.20.1 数据包目录为**复数**） | 维持"仅生成、受限验证"；或不纳入首发 | 已采纳 |
+| 2026-09-15 | 每个 Gradle 大版本线各自携带 wrapper 资产 | ForgeGradle 6 **不兼容 Gradle 9**，Forge 适配器必须用 8.x：新增 `assets/gradle-8.8/`（由 Gradle 8.8 自身 wrapper 任务生成，Apache-2.0，附 PROVENANCE） | 强制 9.x（会破坏 Forge 构建） | 已采纳 |
 | 2026-09-15 | MCP 侧采用 SDK v2（`@modelcontextprotocol/server` ^2.0.0）+ stdio，工具数控制在 <20 | 调研 B：2026-07-28 规范为无状态；stdio 为智能体首选；工具面过大会稀释选择准确率 | SDK v1 + SSE | 已采纳 |
 | 2026-09-15 | 生成产物以"可编译"为验收标准，而非"文件存在" | 单一最强证据：`gradlew build` 通过即证明模板中的版本 API 事实正确 | 快照比对 | 已采纳 |

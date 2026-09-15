@@ -47,6 +47,7 @@ MCP 工具**不执行任何 shell/构建命令**：构建由使用方自行决�
 | --- | --- | --- | --- | --- |
 | `fabric-1.21.1` | 1.21.1 | Fabric (loader 0.19.5) | 21 | ✅ **真编译通过**（产出 jar） |
 | `neoforge-1.21.1` | 1.21.1 | NeoForge (21.1.250, ModDevGradle 2.0.147) | 21 | ⚠️ 已生成，**未编译验证**（本机网络无法访问 maven.neoforged.net；证据见验收报告 §6.1） |
+| `forge-1.20.1` | 1.20.1 | Forge (47.4.10, ForgeGradle 6.0.54, Gradle 8.8) | 17 | ✅ **真编译通过**（产出经 reobfJar 的 jar） |
 
 新增一个目标 = 新增 `packages/adapters/data/<loader>-<mcVersion>.json`（可用 `mcmod adapter <id> --templates` 参考现有适配器），无需改动引擎。
 
@@ -134,7 +135,8 @@ MCMODKIT_API_PORT=7431 node packages/api/dist/index.js   # 仅监听 loopback
 
 ## 状态与边界
 
-- 当前切片：物品 + 方块生成（Java 注册、模型、语言、掉落表、可挖掘标签、创造模式标签）+ 完整工程骨架；Fabric 1.21.1 已通过真实编译验证。
+- 当前切片：物品 + 方块生成（Java 注册、模型、语言、掉落表、可挖掘标签、创造模式标签）+ 完整工程骨架；**Fabric 1.21.1 与 Forge 1.20.1 均已通过真实编译验证**（NeoForge 1.21.1 因本机无法访问 maven.neoforged.net 而未编译验证）。
+- 一键复验：`node scripts/verify-build.mjs --adapter forge-1.20.1 --gradle "8=<gradle-8.8>/bin/gradle.bat" --java-home-17 <jdk17>`（详情见 `docs/acceptance-report.md` §8）。
 - 尚未实现：配方/进度/实体/附魔/UI(Screen)/datagen 生成、跨版本升级工作流、贴图生成。
 - 本机仅 JDK 21 ⇒ 只有 Java 21 目标可本机编译验证；其他版本目标会被明确标注为「仅生成、受限验证」，绝不谎称已验证。
 

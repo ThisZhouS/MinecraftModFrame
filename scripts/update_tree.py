@@ -22,6 +22,8 @@ EXCLUDED = {
     ".gradle",
     "coverage",
     "tmp",
+    # Temporary workspace (gitignored): acceptance artifacts and one-off scripts.
+    "Temp",
 }
 CODE_EXTENSIONS = {".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".cs", ".go", ".rs", ".sql", ".c", ".cpp", ".h"}
 

@@ -5,4 +5,5 @@
 ## 内容
 
 - `packages/adapters/data/fabric-1.21.1.json`
+- `packages/adapters/data/forge-1.20.1.json`
 - `packages/adapters/data/neoforge-1.21.1.json`

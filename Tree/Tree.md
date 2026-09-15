@@ -2,7 +2,7 @@
 
 更新时间: 2026-09-15
 
-排除目录: .clude, .codex, .git, .gradle, .next, __pycache__, build, coverage, dist, node_modules, tmp
+排除目录: .clude, .codex, .git, .gradle, .next, Temp, __pycache__, build, coverage, dist, node_modules, tmp
 
 ```text
 MCMOD/
@@ -20,6 +20,13 @@ MCMOD/
 |-- packages
 |   |-- adapters
 |   |   |-- assets
+|   |   |   |-- gradle-8.8
+|   |   |   |   |-- gradle
+|   |   |   |   |   `-- wrapper
+|   |   |   |   |       `-- gradle-wrapper.jar
+|   |   |   |   |-- gradlew
+|   |   |   |   |-- gradlew.bat
+|   |   |   |   `-- PROVENANCE.md
 |   |   |   `-- gradle-9.5.1
 |   |   |       |-- gradle
 |   |   |       |   `-- wrapper
@@ -29,6 +36,7 @@ MCMOD/
 |   |   |       `-- PROVENANCE.md
 |   |   |-- data
 |   |   |   |-- fabric-1.21.1.json
+|   |   |   |-- forge-1.20.1.json
 |   |   |   `-- neoforge-1.21.1.json
 |   |   |-- src
 |   |   |   `-- index.ts
@@ -82,7 +90,8 @@ MCMOD/
 |-- Prompt
 |   `-- 2026-09-15-项目启动-理念.md
 |-- scripts
-|   `-- update_tree.py
+|   |-- update_tree.py
+|   `-- verify-build.mjs
 |-- Tree
 |-- package.json
 |-- pnpm-lock.yaml

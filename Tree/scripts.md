@@ -5,3 +5,4 @@
 ## 内容
 
 - `scripts/update_tree.py` - symbols: main, symbols, tree_lines, visible_children, write_notes
+- `scripts/verify-build.mjs`

@@ -166,7 +166,8 @@ function genBlocks(ctx: GenContext): BlockGenOut {
     out.langEntries[renderTemplate(ctx.adapter.langKeys.block, { namespace: ctx.vars.namespace!, id: block.id }, "langKeys.block")] = display;
   }
   for (const [tool, values] of Object.entries(mineable)) {
-    const valuesJson = values.map((s) => `"${s}"`).join(",\n    ");
+    // Match the template indent (tabs) so generated tag files stay consistently formatted.
+    const valuesJson = values.map((s) => `"${s}"`).join(",\n\t\t");
     out.files.push({
       path: renderPath(ctx.adapter.contentPaths.mineableTag, { ...ctx.vars, tool }, "contentPaths.mineableTag"),
       content: renderTemplate(ctx.adapter.templates.mineableTag!, { ...ctx.vars, VALUES: valuesJson, tool }, "mineableTag"),

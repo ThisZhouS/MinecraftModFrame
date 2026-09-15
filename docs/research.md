@@ -42,6 +42,11 @@
 | 「版本陷阱」清单 | ✅ 新增一条由编译器发现的陷阱：Mojmap 下 `BlockBehaviour` 在 `net.minecraft.world.level.block.state`，不在 `...level.block` |
 | Forge 生态可经 maven.creeperhost.net 镜像获取 | ✅ 镜像提供 Forge/NeoForge/ModDevGradle 全量工件；本机 `maven.neoforged.net` 被网络阻断（SSL 握手被终止），故适配器把镜像置于仓库首位 |
 | NeoForge 注册机制 = DeferredRegister + DeferredHolder | 🔄 适配器已按该机制生成；真编译因本机无法访问 maven.neoforged.net 而阻塞（证据链见 acceptance-report §6.1） |
+| Forge 1.20.1 生态可达性与版本事实 | ✅ 与 NeoForged 相反，`maven.minecraftforge.net` 本机可达（200）。官方 MDK 47.4.10 实测事实：ForgeGradle 插件 id `net.minecraftforge.gradle` 版本范围 `[6.0,6.2)`（最新 6.0.54）、**Gradle wrapper 8.8**（ForgeGradle 6 **不兼容 Gradle 9**）、Java 17、Mojmap（`mappings channel: 'official'`）、元数据在 `META-INF/mods.toml`、`pack_format=15` |
+| 「Forge 已止步」的第二次证伪 | ✅ Forge 1.20.1 线仍在更新（promotions_slim.json：recommended **47.4.10**、latest **47.4.23**），且官方 MDK 与 maven 均活跃 |
+| 1.20.1 数据包目录是**复数** | ✅ 与 1.21 相反：`data/<ns>/loot_tables/blocks/`、`data/minecraft/tags/blocks/mineable/`（1.21 才改单数）。已由适配器数据层承载，引擎零分支；两个版本线的 jar 均已由真实编译器验证 |
+| Forge 1.20.1 真编译 | ✅ **BUILD SUCCESSFUL**（Temurin JDK 17 + Gradle 8.8 + ForgeGradle 6 + Mojmap），产出经 `reobfJar` 的 jar —— 详见 acceptance-report §5 |
+| 版本陷阱（本轮由编译器/`javap` 取证） | ✅ ① `ItemLike` 在 **1.20.1 与 1.21.1 均为** `net.minecraft.world.level.ItemLike`（`net.minecraft.world.item.ItemLike` 两个版本都不存在）——曾被我误判为「1.20.5 迁移」，由 `javap` 对真实映射 jar 取证纠正；② 1.20.1 Mojmap 的 `ResourceLocation(String,String)` 构造器已 `forRemoval`，应使用 `ResourceLocation.fromNamespaceAndPath`（1.20.1 即存在） |
 
 ## 结论 / Conclusion
 
