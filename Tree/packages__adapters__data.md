@@ -1,0 +1,8 @@
+# 目录： packages/adapters/data
+
+用途：记录该目录的归属和导航入口。
+
+## 内容
+
+- `packages/adapters/data/fabric-1.21.1.json`
+- `packages/adapters/data/neoforge-1.21.1.json`

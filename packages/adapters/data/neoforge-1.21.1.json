@@ -1,0 +1,149 @@
+{
+  "id": "neoforge-1.21.1",
+  "mcVersion": "1.21.1",
+  "loader": "neoforge",
+  "loaderVersion": "21.1.250",
+  "java": 21,
+  "mappings": "official (Mojang mappings, ModDevGradle default)",
+  "basePackagePattern": "com.{{modId}}",
+  "mainClassSimpleName": "ModMain",
+  "gradleWrapperVersion": "9.5.1",
+  "gradle": {
+    "mdgVersion": "2.0.147",
+    "packFormat": 34,
+    "fmlLoaderVersionRange": "[4,)"
+  },
+  "vanillaGroups": {
+    "building_blocks": "CreativeModeTabs.BUILDING_BLOCKS",
+    "natural_blocks": "CreativeModeTabs.NATURAL_BLOCKS",
+    "functional_blocks": "CreativeModeTabs.FUNCTIONAL_BLOCKS",
+    "redstone_blocks": "CreativeModeTabs.REDSTONE_BLOCKS",
+    "tools": "CreativeModeTabs.TOOLS_AND_UTILITIES",
+    "combat": "CreativeModeTabs.COMBAT",
+    "food_and_drinks": "CreativeModeTabs.FOOD_AND_DRINKS",
+    "ingredients": "CreativeModeTabs.INGREDIENTS",
+    "spawn_eggs": "CreativeModeTabs.SPAWN_EGGS"
+  },
+  "assetFiles": [
+    {
+      "path": "gradlew",
+      "asset": "gradle-9.5.1/gradlew"
+    },
+    {
+      "path": "gradlew.bat",
+      "asset": "gradle-9.5.1/gradlew.bat"
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.jar",
+      "asset": "gradle-9.5.1/gradle/wrapper/gradle-wrapper.jar"
+    }
+  ],
+  "projectFiles": [
+    {
+      "path": "settings.gradle",
+      "template": "settingsGradle",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "build.gradle",
+      "template": "buildGradle",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "gradle.properties",
+      "template": "gradleProps",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.properties",
+      "template": "wrapperProps",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": ".gitignore",
+      "template": "gitignore",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "README.md",
+      "template": "projectReadme",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "src/main/resources/META-INF/neoforge.mods.toml",
+      "template": "modsToml",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "src/main/resources/pack.mcmeta",
+      "template": "packMcmeta",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "src/main/java/{{packagePath}}/{{mainClassSimpleName}}.java",
+      "template": "mainClass",
+      "managed": true,
+      "executable": false
+    }
+  ],
+  "templates": {
+    "settingsGradle": "pluginManagement {\n\trepositories {\n\t\tmaven {\n\t\t\tname = 'NeoForged'\n\t\t\turl = 'https://maven.neoforged.net/releases'\n\t\t}\n\t\tmavenCentral()\n\t\tgradlePluginPortal()\n\t}\n}\n\n// ModDevGradle resolves part of its pipeline from repositories it registers itself. Pinning dependency\n// resolution to the list below keeps resolution deterministic; keep the official maven present so\n// artifacts that exist only there still resolve.\ndependencyResolutionManagement {\n\trepositoriesMode = RepositoriesMode.PREFER_SETTINGS\n\trepositories {\n\t\t// Reachability mirror (same content as the official maven) - harmless when the official one is up.\n\t\tmaven { name = 'NeoForgedMirror'; url = 'https://maven.creeperhost.net' }\n\t\tmavenCentral()\n\t\tmaven { name = 'MojangLibraries'; url = 'https://libraries.minecraft.net' }\n\t\tmaven { name = 'NeoForged'; url = 'https://maven.neoforged.net/releases' }\n\t}\n}\n\nrootProject.name = '{{modId}}'\n",
+    "buildGradle": "plugins {\n\tid 'java-library'\n\tid 'net.neoforged.moddev' version '{{gradle_mdgVersion}}'\n}\n\nversion = project.mod_version\ngroup = project.mod_group_id\n\njava.toolchain.languageVersion = JavaLanguageVersion.of({{javaVersion}})\n\nrepositories {\n\tmavenCentral()\n}\n\nneoForge {\n\tversion = project.neo_version\n\n\truns {\n\t\tclient {\n\t\t\tclient()\n\t\t}\n\t\tserver {\n\t\t\tserver()\n\t\t}\n\t}\n\n\tmods {\n\t\t'{{modId}}' {\n\t\t\tsourceSet(sourceSets.main)\n\t\t}\n\t}\n}\n\ntasks.withType(JavaCompile).configureEach {\n\toptions.encoding = 'UTF-8'\n}\n",
+    "gradleProps": "org.gradle.jvmargs=-Xmx2G\norg.gradle.parallel=true\norg.gradle.configuration-cache=false\n\n# NeoForge (versions: https://maven.neoforged.net/releases/net/neoforged/neoforge/)\nminecraft_version={{mcVersion}}\nneo_version={{loaderVersion}}\n\n# Mod properties\nmod_version={{modVersion}}\nmod_group_id={{packageName}}\n",
+    "wrapperProps": "distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-{{gradleWrapperVersion}}-bin.zip\nnetworkTimeout=10000\nvalidateDistributionUrl=true\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n",
+    "gitignore": ".gradle/\nbuild/\nrun/\n.idea/\n*.iml\n",
+    "projectReadme": "# {{modName}}\n\nMinecraft {{mcVersion}} / NeoForge {{loaderVersion}} mod, generated by mcmodkit from a ModSpec.\n\n## Build\n\n```\ngradlew.bat build      # Windows\n./gradlew build        # macOS / Linux\n```\n\nThe mod jar is written to build/libs/. Requires JDK {{javaVersion}}; the first build downloads NeoForge and Minecraft (several hundred MB).\n\n## Run\n\n`gradlew.bat runClient` / `runServer` start a development client/server with the mod loaded.\n\n## Textures (not generated)\n\nModels reference these 16x16 PNG files - add them before shipping:\n\n- src/main/resources/assets/{{namespace}}/textures/item/<item id>.png\n- src/main/resources/assets/{{namespace}}/textures/block/<block id>.png\n\n## Iterate\n\nEdit the ModSpec JSON and regenerate: mcmodkit overwrites the files it manages and never touches your own files.\n",
+    "mainClass": "package {{packageName}};\n\nimport com.mojang.logging.LogUtils;\nimport net.minecraft.resources.ResourceLocation;\nimport net.neoforged.bus.api.IEventBus;\nimport net.neoforged.fml.ModContainer;\nimport net.neoforged.fml.common.Mod;\nimport org.slf4j.Logger;\n\n@Mod({{mainClassSimpleName}}.MOD_ID)\npublic class {{mainClassSimpleName}} {\n\tpublic static final String MOD_ID = \"{{modId}}\";\n\tpublic static final Logger LOGGER = LogUtils.getLogger();\n\n\tpublic {{mainClassSimpleName}}(IEventBus modEventBus, ModContainer modContainer) {\n\t\t{{mainClassSimpleName}}Items.register(modEventBus);\n\t\t{{mainClassSimpleName}}Blocks.register(modEventBus);\n\t\tLOGGER.info(\"{} initialized for Minecraft {{mcVersion}}\", MOD_ID);\n\t}\n\n\t/** Namespaced id helper. */\n\tpublic static ResourceLocation id(String path) {\n\t\treturn ResourceLocation.fromNamespaceAndPath(MOD_ID, path);\n\t}\n}\n",
+    "itemsRegistryClass": "package {{packageName}};\n\nimport java.util.ArrayList;\nimport java.util.List;\nimport java.util.function.Supplier;\n\nimport net.minecraft.core.registries.Registries;\nimport net.minecraft.network.chat.Component;\nimport net.minecraft.resources.ResourceKey;\nimport net.minecraft.world.item.CreativeModeTab;\nimport net.minecraft.world.item.CreativeModeTabs;\nimport net.minecraft.world.item.Item;\nimport net.minecraft.world.item.ItemStack;\nimport net.minecraft.world.item.Items;\nimport net.minecraft.world.level.ItemLike;\nimport net.neoforged.bus.api.IEventBus;\nimport net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;\nimport net.neoforged.neoforge.registries.DeferredHolder;\nimport net.neoforged.neoforge.registries.DeferredItem;\nimport net.neoforged.neoforge.registries.DeferredRegister;\n\n/** Items of {{modName}} (generated by mcmodkit). */\npublic final class {{mainClassSimpleName}}Items {\n\tpublic static final DeferredRegister.Items ITEMS = DeferredRegister.createItems({{mainClassSimpleName}}.MOD_ID);\n\tpublic static final DeferredRegister<CreativeModeTab> TABS =\n\t\tDeferredRegister.create(Registries.CREATIVE_MODE_TAB, {{mainClassSimpleName}}.MOD_ID);\n\n\tprivate static final List<Supplier<? extends ItemLike>> TAB_ENTRIES = new ArrayList<>();\n\n\tpublic static final ResourceKey<CreativeModeTab> TAB_KEY =\n\t\tResourceKey.create(Registries.CREATIVE_MODE_TAB, {{mainClassSimpleName}}.id(\"{{modId}}\"));\n\n\tpublic static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = TABS.register(\"{{modId}}\",\n\t\t() -> CreativeModeTab.builder()\n\t\t\t.title(Component.translatable(\"itemGroup.{{namespace}}\"))\n\t\t\t.icon(() -> new ItemStack(TAB_ENTRIES.isEmpty() ? Items.STONE : TAB_ENTRIES.get(0).get()))\n\t\t\t.displayItems((params, output) -> {\n\t\t\t\tfor (Supplier<? extends ItemLike> entry : TAB_ENTRIES) {\n\t\t\t\t\toutput.accept(entry.get());\n\t\t\t\t}\n\t\t\t})\n\t\t\t.build());\n\n{{ITEM_REGISTRATIONS}}\n\n\tprivate {{mainClassSimpleName}}Items() {\n\t}\n\n\tpublic static void register(IEventBus modBus) {\n\t\tITEMS.register(modBus);\n\t\tTABS.register(modBus);\n{{TAB_BLOCK}}\n{{ITEM_GROUP_HOOKS}}\n\t}\n}\n",
+    "blocksRegistryClass": "package {{packageName}};\n\nimport net.minecraft.world.item.BlockItem;\nimport net.minecraft.world.level.block.Block;\nimport net.minecraft.world.level.block.state.BlockBehaviour;\nimport net.neoforged.bus.api.IEventBus;\nimport net.neoforged.neoforge.registries.DeferredBlock;\nimport net.neoforged.neoforge.registries.DeferredItem;\nimport net.neoforged.neoforge.registries.DeferredRegister;\n\n/** Blocks of {{modName}} (generated by mcmodkit). Each block gets a matching BlockItem. */\npublic final class {{mainClassSimpleName}}Blocks {\n\tpublic static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks({{mainClassSimpleName}}.MOD_ID);\n\n{{BLOCK_REGISTRATIONS}}\n\n\tprivate {{mainClassSimpleName}}Blocks() {\n\t}\n\n\tpublic static void register(IEventBus modBus) {\n\t\tBLOCKS.register(modBus);\n\t}\n}\n",
+    "itemRegistration": "\tpublic static final DeferredItem<Item> {{CONST_UPPER}} = ITEMS.registerSimpleItem(\"{{REG_NAME}}\", {{SETTINGS}});",
+    "itemRegistrationGroup": "\t\tmodBus.addListener((BuildCreativeModeTabContentsEvent event) -> {\n\t\t\tif (event.getTabKey() == {{GROUP_EXPR}}) {\n\t\t\t\tevent.accept({{mainClassSimpleName}}Items.{{CONST_UPPER}}.get());\n\t\t\t}\n\t\t});",
+    "itemSettings": "new Item.Properties()",
+    "itemSettingsMaxCount": "new Item.Properties().stacksTo({{MAX_COUNT}})",
+    "blockRegistration": "\tpublic static final DeferredBlock<Block> {{CONST_UPPER}} = BLOCKS.register(\"{{REG_NAME}}\", () -> new Block({{SETTINGS}}));\n\tpublic static final DeferredItem<BlockItem> {{CONST_UPPER}}_ITEM = {{mainClassSimpleName}}Items.ITEMS.registerSimpleBlockItem(\"{{REG_NAME}}\", {{CONST_UPPER}});",
+    "blockSettings": "BlockBehaviour.Properties.of().strength({{HARDNESS}}F, {{RESISTANCE}}F).requiresCorrectToolForDrops()",
+    "blockSettingsNoTool": "BlockBehaviour.Properties.of().strength({{HARDNESS}}F, {{RESISTANCE}}F)",
+    "tabBlock": "{{TAB_ENTRIES}}",
+    "tabEntryLineItem": "\t\tTAB_ENTRIES.add({{mainClassSimpleName}}Items.{{CONST_UPPER}});",
+    "tabEntryLineBlock": "\t\tTAB_ENTRIES.add({{mainClassSimpleName}}Blocks.{{CONST_UPPER}}_ITEM);",
+    "blockState": "{\n\t\"variants\": {\n\t\t\"\": { \"model\": \"{{namespace}}:block/{{REG_NAME}}\" }\n\t}\n}\n",
+    "blockModel": "{\n\t\"parent\": \"minecraft:block/cube_all\",\n\t\"textures\": {\n\t\t\"all\": \"{{namespace}}:block/{{REG_NAME}}\"\n\t}\n}\n",
+    "blockItemModel": "{\n\t\"parent\": \"{{namespace}}:block/{{REG_NAME}}\"\n}\n",
+    "itemModel": "{\n\t\"parent\": \"minecraft:item/generated\",\n\t\"textures\": {\n\t\t\"layer0\": \"{{namespace}}:item/{{REG_NAME}}\"\n\t}\n}\n",
+    "lootTable": "{\n\t\"type\": \"minecraft:block\",\n\t\"pools\": [\n\t\t{\n\t\t\t\"rolls\": 1,\n\t\t\t\"bonus_rolls\": 0,\n\t\t\t\"entries\": [\n\t\t\t\t{\n\t\t\t\t\t\"type\": \"minecraft:item\",\n\t\t\t\t\t\"name\": \"{{namespace}}:{{REG_NAME}}\"\n\t\t\t\t}\n\t\t\t],\n\t\t\t\"conditions\": [\n\t\t\t\t{ \"condition\": \"minecraft:survives_explosion\" }\n\t\t\t]\n\t\t}\n\t]\n}\n",
+    "mineableTag": "{\n\t\"replace\": false,\n\t\"values\": [\n\t\t{{VALUES}}\n\t]\n}\n",
+    "packMcmeta": "{\n\t\"pack\": {\n\t\t\"pack_format\": {{gradle_packFormat}},\n\t\t\"description\": \"{{modName}}\"\n\t}\n}\n",
+    "modsToml": "modLoader = \"javafml\"\nloaderVersion = \"[4,)\"\nlicense = \"{{license}}\"\n\n[[mods]]\nmodId = \"{{modId}}\"\nversion = \"{{modVersion}}\"\ndisplayName = \"{{modName}}\"\ndescription = '''{{description}}'''\n\n[[dependencies.{{modId}}]]\nmodId = \"neoforge\"\ntype = \"required\"\nversionRange = \"[{{loaderVersion}},)\"\nordering = \"NONE\"\nside = \"BOTH\"\n\n[[dependencies.{{modId}}]]\nmodId = \"minecraft\"\ntype = \"required\"\nversionRange = \"[{{mcVersion}},)\"\nordering = \"NONE\"\nside = \"BOTH\"\n"
+  },
+  "contentPaths": {
+    "itemModel": "src/main/resources/assets/{{namespace}}/models/item/{{id}}.json",
+    "blockState": "src/main/resources/assets/{{namespace}}/blockstates/{{id}}.json",
+    "blockModel": "src/main/resources/assets/{{namespace}}/models/block/{{id}}.json",
+    "blockItemModel": "src/main/resources/assets/{{namespace}}/models/item/{{id}}.json",
+    "lootTable": "src/main/resources/data/{{namespace}}/loot_table/blocks/{{id}}.json",
+    "mineableTag": "src/main/resources/data/minecraft/tags/block/mineable/{{tool}}.json",
+    "lang": "src/main/resources/assets/{{namespace}}/lang/en_us.json"
+  },
+  "langKeys": {
+    "item": "item.{{namespace}}.{{id}}",
+    "block": "block.{{namespace}}.{{id}}",
+    "itemGroup": "itemGroup.{{namespace}}"
+  },
+  "notes": [
+    "Registration uses DeferredRegister + DeferredHolder on the mod event bus (NeoForge), unlike Fabric's direct Registry.register.",
+    "Mappings are Mojang official (ModDevGradle default): no mappings dependency to pin.",
+    "Datapack directories are singular since 1.21: data/<ns>/loot_table/... and data/minecraft/tags/block/...",
+    "Textures are not generated: add 16x16 PNGs under assets/<ns>/textures/{item,block}/<id>.png.",
+    "maven.neoforged.net is blocked on some networks; settings.gradle lists the creeperhost mirror as a fallback.",
+    "Requires JDK 21. First build downloads NeoForge + Minecraft (several hundred MB).",
+    "Compile verification status: NOT verified on the authoring machine - maven.neoforged.net is unreachable there (TLS reset) and the mirror lacks net.neoforged:minecraft-dependencies:1.21.1 (HTTP 404), which ModDevGradle needs to build Minecraft artifacts. See docs/acceptance-report.md section 6."
+  ]
+}

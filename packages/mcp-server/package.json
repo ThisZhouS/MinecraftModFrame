@@ -1,0 +1,29 @@
+{
+  "name": "@mcmodkit/mcp-server",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "mcmodkit MCP server: exposes the mod-generation workflow as MCP tools",
+  "bin": {
+    "mcmodkit-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@mcmodkit/adapters": "workspace:*",
+    "@mcmodkit/core": "workspace:*",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "zod": "*"
+  },
+  "devDependencies": {
+    "typescript": "*",
+    "vitest": "*",
+    "@types/node": "*"
+  }
+}

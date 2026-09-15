@@ -1,0 +1,24 @@
+{
+  "name": "@mcmodkit/api",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "mcmodkit HTTP API: JSON endpoints over the same core workflow",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@mcmodkit/adapters": "workspace:*",
+    "@mcmodkit/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "*",
+    "vitest": "*",
+    "@types/node": "*"
+  }
+}
