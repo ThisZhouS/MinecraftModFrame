@@ -100,6 +100,8 @@ $env:JAVA_HOME=<temurin-17>; gradle build --console=plain --no-daemon
 | 3 | 官方 maven 置于最后 | ❌ `neoFormRuntimeExternalTools` 失败 | `neoform-runtime` 只能从 MDG 自注册仓库（官方）取得 |
 | 4 | `PREFER_SETTINGS` 强制设置级仓库 | ❌ `minecraft-dependencies` 缺失 | 插件与 neoform-runtime 均从镜像解析成功；但 `net.neoforged:minecraft-dependencies:1.21.1` 在镜像 **404**（curl 实测），仅有官方 maven 提供 |
 
+**离线静态校验（本轮新增，作为阻塞下的最大努力）**：对 NeoForge 适配器模板引用的 13 个 `net.minecraft.*` 类逐个 `javap` 校验（1.21.1 Mojmap 真实 jar）→ **13/13 存在**；但 8 个 `net.neoforged.*` 类**无法离线校验**：其类文件位于 `neoforge-*-universal.jar` 与 FML 工件，均托管在被阻断的 maven 上（本地 userdev jar 只含 `config.json` / `patches/` / `joined.lzma`，而 joined 包内是补丁后的原版 MC，不含 NeoForge 代码）。因此 NeoForge 侧 API 仍必须在可达网络上编译验证 —— 对照经验：Forge 线同样的模板结构被编译器抓出两处 API 错误（§5 表首行），静态检查无法替代编译。
+
 结论：**本机无法完成 NeoForge 编译验证**。已确认有效：适配器加载、lint、26 文件生成、零残留占位符、插件 id 与版本号取自官方元数据（ModDevGradle 2.0.147 / NeoForge 21.1.250）。**未验证**：NeoForge Java 模板的 API 正确性（对照：Forge 线同样的模板结构刚被编译器抓出两处 API 错误，说明这类验证不可省略）。因此 `neoforge-1.21.1` 一律标注「已生成，未编译验证」。
 
 ### 7.2 其他阻塞 / 跳过
