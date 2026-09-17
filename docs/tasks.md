@@ -25,6 +25,14 @@
 - `packages/api`：`node:http` JSON API（`/api/versions`、`/api/validate`、`/api/generate` 等）。
 - 测试分布：core 14、adapters 10、cli 4、mcp-server 6、api 6。
 
+## S8 交付物（配方 + 进度，已完成）
+
+- Spec 新增 `content.recipes[]`（7 种配方类型，含 pattern/key/ingredients/ingredient/experience/cookingTime/count/group 与跨字段校验）与 `content.advancements[]`（父子树、icon、unlockRecipes、hasItems、frame/展示开关、根进度背景）。
+- 引擎 `genRecipes` / `genAdvancements`：引用解析（本 mod id → `ns:id`，显式资源位置直通，未知 id 报字段级错误）、默认烹饪时间、判据与 `rewards.recipes`、语言键。
+- 三个适配器各新增 7 个模板（4 配方 + advancement + 两种物品谓词）与 2 个 langKeys；数据包目录按版本分叉（`recipe/` vs `recipes/`）。
+- **方法学补充**：数据包 JSON 的语义不由 `gradle build` 校验，因此以 **jar 内原版数据**为权威源逐字段对照，发现并修复 4 处版本方言（`item`→`id`、烹饪 result 形态、切石形态、物品谓词形态）。
+- 验收：Fabric/Forge 真编译通过，jar 内 6 个数据文件路径与内容正确；61 项测试通过。
+
 ## S7 交付物（UI 切片，已完成）
 
 - Spec 新增 `ui.screens[]`：id / title / key(A-Z) / width / height / lines。

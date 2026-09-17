@@ -87,6 +87,27 @@ out/my-mod/
 
 产出：`client/<Mod>GuideScreen.java`（Screen 子类 + Done 按钮）、`client/<Mod>Client.java`（按键注册与打开逻辑）、以及标题/每行/按键名/按键分类 4 类语言键。三个加载器各自用**自己的**事件与入口（Fabric 的 `ClientModInitializer` + `fabric.mod.json` client entrypoint；Forge/NeoForge 的 `@Mod.EventBusSubscriber`/`@EventBusSubscriber` + `RegisterKeyMappingsEvent`），引擎只做装配。
 
+## 配方与进度生成
+
+```jsonc
+"content": {
+  "recipes": [
+    { "id": "charged_ruby", "type": "crafting_shaped", "pattern": ["RR","RR"], "key": { "R": "ruby" }, "result": "charged_ruby" },
+    { "id": "ruby_from_smelting", "type": "smelting", "ingredient": "ruby_ore", "result": "ruby", "experience": 0.7 },
+    { "id": "ruby_from_charged", "type": "crafting_shapeless", "ingredients": ["charged_ruby", "charged_ruby"], "result": "ruby", "count": 2 }
+  ],
+  "advancements": [
+    { "id": "root", "title": "Ruby Rush", "hasItems": ["ruby"], "background": "minecraft:textures/block/stone.png" },
+    { "id": "charged", "parent": "root", "unlockRecipes": ["charged_ruby"] }
+  ]
+}
+```
+
+- 配方类型：`crafting_shaped` / `crafting_shapeless` / `smelting` / `blasting` / `smoking` / `campfire_cooking` / `stonecutting`。
+- 引用可写本 mod 的内容 id（`"ruby"` → `examplemod:ruby`），也可直接写资源位置（`"minecraft:stick"`）或标签（`"#minecraft:coals"`）；写错的 id 会得到**字段级报错**并列出可用 id。
+- 进度自动生成判据（`minecraft:recipe_unlocked` + `minecraft:inventory_changed`）、`rewards.recipes`（配方书解锁）与语言键。
+- **版本方言自动适配**：1.21 把物品栈的键从 `item` 改成 `id`、把物品谓词拍平成字符串、烹饪/切石 result 换成对象形态，数据包目录也从 `recipes/` 变 `recipe/`（`advancements/` → `advancement/`）——这些差异全部写在适配器数据里，引擎零版本分支。方言以 **jar 内原版数据**为准（编译不校验 JSON 语义）。
+
 ## 接给智能体 / Wiring an agent
 
 ### MCP（stdio，推荐）

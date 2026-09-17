@@ -8,9 +8,9 @@
 | 层级 | 内容 | 结果 |
 | --- | --- | --- |
 | L1 静态 | 5 个包 `tsc`（build 内置） | ✅ 通过 |
-| L2 单元/组件 | core / adapters / cli / mcp-server / api 的 vitest 用例 | ✅ **50 passed**（见 §2） |
+| L2 单元/组件 | core / adapters / cli / mcp-server / api 的 vitest 用例 | ✅ **61 passed**（见 §2） |
 | L3 集成（三面） | CLI 端到端生成、MCP stdio JSON-RPC 全链路、HTTP API 端点 | ✅ 通过（见 §3） |
-| L4 真编译（内容） | 物品/方块/资源/数据包生成结果在目标 JDK + Gradle 下 `build` | ✅ Fabric 1.21.1、✅ Forge 1.20.1；⛔ NeoForge（见 §8.1） |
+| L4 真编译（内容） | 物品/方块/资源/数据包生成结果在目标 JDK + Gradle 下 `build` | ✅ Fabric 1.21.1、✅ Forge 1.20.1；⛔ NeoForge（见 §9.1） |
 | L4 真编译（UI） | Screen + 按键绑定 + 客户端引导生成结果 `build` | ✅ Fabric 1.21.1（1m58s）、✅ Forge 1.20.1（30s）（见 §6） |
 | L5 一键复验 | `scripts/verify-build.mjs` 按适配器声明的 Gradle 线自动复跑编译 | ✅ 已交付（见 §9） |
 
@@ -26,7 +26,7 @@
 | `@mcmodkit/mcp-server` | 6 | 工具定义与 `callTool` 分发、错误信封 | ✅ |
 | `@mcmodkit/api` | 6 | 路由与状态码（200/400/404/500）、信封结构 | ✅ |
 
-合计 **50 passed / 0 failed**。护栏在迭代中反复拦截真实缺陷：Forge 模板注释硬编码 MC 版本、UI 契约「只实现一半」、Screen 的 `renderBackground` 版本签名写错。
+合计 **61 passed / 0 failed**。护栏在迭代中反复拦截真实缺陷：Forge 模板注释硬编码 MC 版本、UI 契约「只实现一半」、Screen 的 `renderBackground` 版本签名写错。
 
 ## 3. L3 集成：三个智能体接入面
 
@@ -92,16 +92,49 @@ Spec 里一段声明：
 
 取证方法延续上一轮：先 `javap` 真实映射 jar 得到签名，再写模板，最后用真实编译器确认 —— 静态检查与编译验证各司其职。
 
-## 7. 本轮交付的其他能力
+## 7. 数据切片（二）：配方 + 进度（本轮新增）
+
+### 7.1 生成的产物
+
+同一份 Spec 声明 4 个配方（有序合成 / 熔炼 / 高炉 / 无序合成）与 2 个进度（根 + 子），引擎产出 6 个 JSON；两版真编译产物入 jar：
+
+| 版本线 | jar 内数据包路径（实测） |
+| --- | --- |
+| Fabric 1.21.1（jar 16,575 B） | `data/verifyfabric/recipe/*.json`、`data/verifyfabric/advancement/*.json`、`data/verifyfabric/loot_table/…`、`data/minecraft/tags/block/mineable/…`（**全单数**） |
+| Forge 1.20.1（jar 18,345 B） | `data/verifyforge/recipes/*.json`、`data/verifyforge/advancements/*.json`、`data/verifyforge/loot_tables/…`、`data/minecraft/tags/blocks/mineable/…`（**全复数**） |
+
+### 7.2 本轮最重要的发现：数据包 JSON 的「版本方言」
+
+编译验证**不会**校验数据包 JSON —— 字段名写错照样 `BUILD SUCCESSFUL`。因此本轮改用**权威源**：直接读 jar 里的**原版数据文件**（1.20.1 客户端 jar 5887 条、1.21.1 服务端 jar 6795 条 `data/minecraft/**`）逐字段对照，结果发现 4 处会让 1.21.1 侧数据全部失效的方言差异：
+
+| 位置 | 1.20.1（原版实测） | 1.21.1（原版实测） |
+| --- | --- | --- |
+| 物品栈（配方 result / 进度 icon） | `{"item": "minecraft:oak_planks", "count": 4}` | `{"id": "minecraft:oak_planks", "count": 4}` |
+| 烹饪类配方 result | `"result": "minecraft:iron_ingot"`（字符串） | `"result": {"id": "minecraft:iron_ingot"}` |
+| 切石配方 | `"result": "minecraft:deepslate_tiles"` + `"count": 1` | `"result": {"id": "…", "count": 1}` |
+| 进度物品谓词 | `"items": [{"items": ["minecraft:diamond"]}]`（对象列表；标签用 `{"tag": …}`） | `"items": "minecraft:diamond"`（字符串；标签用 `"#minecraft:…"`） |
+
+处理方式：**全部下沉为适配器模板片段**（`recipeShaped/Shapeless/Cooking/Stonecutting`、`advancement`、`advancementItemPredicate`、`advancementTagPredicate`），引擎只传原始值（`{{RESULT_ITEM}}`、`{{COUNT}}`、`{{ADV_ICON_ITEM}}`、`{{ITEM_ID}}`/`{{TAG_ID}}`）——引擎依旧零版本分支，并有两组护栏测试钉住两版写法。
+
+顺带一处机制修正：原版解锁配方靠 `rewards.recipes`（配方书）+ `minecraft:recipe_unlocked` 判据，本框架现在两者都生成（两版同形）。
+
+### 7.3 验收
+
+| 项 | 证据 |
+| --- | --- |
+| 真编译 | Fabric **PASS（122s）**、Forge **PASS（44s）**，jar 内含全部 6 个数据文件 |
+| 单测 | 61 passed（core 29 / adapters 16 / cli 4 / mcp 6 / api 6），含配方/进度的引擎逻辑、默认烹饪时间、判据与 rewards、父级引用、非法引用的字段级报错、两版方言护栏、所有生成 JSON 可解析 |
+| 人工比对 | 生成文件与原版样本逐字段一致（见 §7.2 表） |
+## 8. 本轮交付的其他能力
 
 - Spec 新增 `ui.screens[]`（id/title/key/width/height/lines），缺省值可省略；非法键给出字段级报错。
 - 适配器契约新增 `keyCodePattern`（键码表达式，默认 `org.lwjgl.glfw.GLFW.GLFW_KEY_{{KEY}}`）与 `clientSubpackage`；UI 模板「可选但全有或全无」，由 lint 强制。
 - `scripts/verify-build.mjs`：一键复验，按适配器声明的 wrapper 版本选 Gradle 线。
 - Gradle 9.5.1 经腾讯云镜像重新取得（`services.gradle.org` 会跳转到被阻断的 github.com），Fabric 线复验能力恢复。
 
-## 8. 阻塞 / 跳过 / 不适用
+## 9. 阻塞 / 跳过 / 不适用
 
-### 8.1 NeoForge 1.21.1 真编译 —— ⛔ 阻塞（环境）
+### 9.1 NeoForge 1.21.1 真编译 —— ⛔ 阻塞（环境）
 
 | 尝试 | 配置 | 结果 | 说明 |
 | --- | --- | --- | --- |
@@ -114,7 +147,7 @@ Spec 里一段声明：
 
 结论：**本机无法完成 NeoForge 编译验证**。`neoforge-1.21.1` 一律标注「已生成，未编译验证」。对照经验：Forge 线同样的模板结构被编译器抓出 3 处 API 错误（§5、§6.4），静态检查无法替代编译。
 
-### 8.2 其他阻塞 / 跳过
+### 9.2 其他阻塞 / 跳过
 
 | 项 | 状态 | 原因与影响 |
 | --- | --- | --- |
@@ -124,7 +157,7 @@ Spec 里一段声明：
 | MC 26.x（Java 25）目标 | ⏭ 跳过 | 无 JDK 25；未纳入本期适配器 |
 | Linux/macOS 生成与构建 | ⏭ 跳过 | 本机为 Windows；已用 posix 相对路径 + `executable` 位降低风险，未实测 |
 
-## 9. 一键复验 / Re-verification
+## 10. 一键复验 / Re-verification
 
 ```bash
 pnpm -r build && pnpm -r test            # 50 passed
@@ -136,9 +169,9 @@ node scripts/verify-build.mjs --adapter forge-1.20.1 \
 
 脚本按**适配器声明的 `gradleWrapperVersion`** 选择 Gradle 线，缺工具链时如实报 `SKIPPED`；失败退出码 1，并在 `Temp/verify-build/<adapter>/build.log` 留完整日志。
 
-## 10. 遗留风险与缺口
+## 11. 遗留风险与缺口
 
-1. **NeoForge 未编译验证**：见 §8.1；在能访问 `maven.neoforged.net` 的机器上跑 `verify-build.mjs --adapter neoforge-1.21.1` 即可补齐。
+1. **NeoForge 未编译验证**：见 §9.1；在能访问 `maven.neoforged.net` 的机器上跑 `verify-build.mjs --adapter neoforge-1.21.1` 即可补齐。
 2. **UI 只到「可编译」**：没有运行时验证（无法在无图形环境启动客户端），也没有贴图/字体/交互逻辑（输入框、列表、滚动）。
 3. **版本漂移**：适配器钉住的版本号会随上游变旧，需要版本巡检工作流（数据源见 docs/research/2026-09-version-api-knowledge.md §2.4）。
 4. **贴图缺失**：物品/方块贴图需自备（生成工程 README 已明确）。

@@ -59,6 +59,15 @@ export function makeFixtureAdapter(): AdapterRecordT {
       keybindField: "\tstatic final Key KEY = key({{KEY_CODE}}, {{KEYBIND_LANG_KEY}}, {{KEYBIND_CATEGORY_KEY}}); // {{KEYBIND_CONST}}",
       keybindRegister: "\t\tregister({{KEYBIND_CONST}});",
       screenOpenStatement: "\t\topen({{KEYBIND_CONST}}, {{SCREEN_CLASS}});",
+      // Recipe/advancement templates: fake JSON, but each must consume the placeholders the engine supplies.
+      recipeShaped: '{"type":"minecraft:crafting_shaped","pattern":{{PATTERN_JSON}},"key":{{KEY_JSON}},"result":{"item":"{{RESULT_ITEM}}","count":{{COUNT}}}}\n',
+      recipeShapeless: '{"type":"minecraft:crafting_shapeless","ingredients":{{INGREDIENTS_JSON}},"result":{"item":"{{RESULT_ITEM}}","count":{{COUNT}}}}\n',
+      recipeCooking: '{"type":"{{RECIPE_TYPE}}","ingredient":{{INGREDIENT_JSON}},"result":"{{RESULT_ITEM}}","experience":{{EXPERIENCE}},"cookingtime":{{COOKING_TIME}}}\n',
+      recipeStonecutting: '{"type":"minecraft:stonecutting","ingredient":{{INGREDIENT_JSON}},"result":"{{RESULT_ITEM}}","count":{{COUNT}}}\n',
+      advancement:
+        '{{{ADV_PARENT_LINE}}{{ADV_BACKGROUND_LINE}}"display":{"icon":{"item":"{{ADV_ICON_ITEM}}"},"title":{{ADV_TITLE_JSON}},"description":{{ADV_DESCRIPTION_JSON}},"frame":"{{ADV_FRAME}}","show_toast":{{ADV_SHOW_TOAST}},"announce_to_chat":{{ADV_ANNOUNCE_TO_CHAT}},"hidden":{{ADV_HIDDEN}}},"criteria":{{ADV_CRITERIA_JSON}},{{ADV_REWARDS_LINE}}"requirements":{{ADV_REQUIREMENTS_JSON}}}\n',
+      advancementItemPredicate: '{"items":{"item":"{{ITEM_ID}}"},"tag":"{{TAG_ID}}"}',
+      advancementTagPredicate: '{"tag":"{{TAG_ID}}","item":"{{ITEM_ID}}"}',
     },
     contentPaths: {
       itemModel: "src/main/resources/assets/{{namespace}}/models/item/{{id}}.json",
@@ -68,6 +77,8 @@ export function makeFixtureAdapter(): AdapterRecordT {
       lootTable: "src/main/resources/data/{{namespace}}/loot_table/blocks/{{id}}.json",
       mineableTag: "src/main/resources/data/minecraft/tags/block/mineable/{{tool}}.json",
       lang: "src/main/resources/assets/{{namespace}}/lang/en_us.json",
+      recipe: "src/main/resources/data/{{namespace}}/recipe/{{id}}.json",
+      advancement: "src/main/resources/data/{{namespace}}/advancement/{{id}}.json",
     },
     langKeys: {
       item: "item.{{namespace}}.{{id}}",
@@ -77,6 +88,8 @@ export function makeFixtureAdapter(): AdapterRecordT {
       screenLine: "screen.{{namespace}}.{{id}}.line.{{n}}",
       keybind: "key.{{namespace}}.{{id}}",
       keybindCategory: "key.categories.{{namespace}}",
+      advancementTitle: "advancements.{{namespace}}.{{id}}.title",
+      advancementDescription: "advancements.{{namespace}}.{{id}}.description",
     },
     notes: ["fixture adapter for core tests"],
   };

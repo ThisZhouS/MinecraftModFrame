@@ -31,6 +31,10 @@ export const ContentPathsSpec = z.object({
   lootTable: z.string(),
   mineableTag: z.string(),
   lang: z.string(),
+  /** Optional: required only by adapters that support content.recipes. */
+  recipe: z.string().optional(),
+  /** Optional: required only by adapters that support content.advancements. */
+  advancement: z.string().optional(),
 });
 
 export const LangKeysSpec = z.object({
@@ -42,6 +46,9 @@ export const LangKeysSpec = z.object({
   screenLine: z.string().optional(),
   keybind: z.string().optional(),
   keybindCategory: z.string().optional(),
+  /** Optional: required only by adapters that support content.advancements. */
+  advancementTitle: z.string().optional(),
+  advancementDescription: z.string().optional(),
 });
 
 /** Template keys the built-in generators require. */
@@ -82,6 +89,15 @@ export const UI_TEMPLATE_KEYS = [
 
 /** Language keys the UI generator needs alongside UI_TEMPLATE_KEYS. */
 export const UI_LANG_KEYS = ["screenTitle", "screenLine", "keybind", "keybindCategory"] as const;
+
+/** Template keys the recipe generator needs (all-or-nothing, like the UI set). */
+export const RECIPE_TEMPLATE_KEYS = ["recipeShaped", "recipeShapeless", "recipeCooking", "recipeStonecutting"] as const;
+
+/** Template keys the advancement generator needs. */
+export const ADVANCEMENT_TEMPLATE_KEYS = ["advancement", "advancementItemPredicate", "advancementTagPredicate"] as const;
+
+/** Language keys the advancement generator needs. */
+export const ADVANCEMENT_LANG_KEYS = ["advancementTitle", "advancementDescription"] as const;
 
 export const AdapterRecord = z.object({
   /** e.g. "fabric-1.21.1" */
@@ -166,6 +182,14 @@ const REQUIRED_PLACEHOLDERS: Record<string, string[]> = {
   keybindField: ["{{KEYBIND_CONST}}", "{{KEY_CODE}}", "{{KEYBIND_LANG_KEY}}"],
   keybindRegister: ["{{KEYBIND_CONST}}"],
   screenOpenStatement: ["{{KEYBIND_CONST}}", "{{SCREEN_CLASS}}"],
+  // Recipe templates (present only on recipe-capable adapters).
+  recipeShaped: ["{{PATTERN_JSON}}", "{{KEY_JSON}}", "{{RESULT_ITEM}}", "{{COUNT}}"],
+  recipeShapeless: ["{{INGREDIENTS_JSON}}", "{{RESULT_ITEM}}", "{{COUNT}}"],
+  recipeCooking: ["{{RECIPE_TYPE}}", "{{INGREDIENT_JSON}}", "{{RESULT_ITEM}}", "{{COOKING_TIME}}"],
+  recipeStonecutting: ["{{INGREDIENT_JSON}}", "{{RESULT_ITEM}}", "{{COUNT}}"],
+  advancement: ["{{ADV_ICON_ITEM}}", "{{ADV_TITLE_JSON}}", "{{ADV_CRITERIA_JSON}}", "{{ADV_REQUIREMENTS_JSON}}"],
+  advancementItemPredicate: ["{{ITEM_ID}}"],
+  advancementTagPredicate: ["{{TAG_ID}}"],
 };
 
 /** Static sanity checks beyond the schema: referenced template keys must exist and stay wired up. */
@@ -205,6 +229,26 @@ export function lintAdapter(a: AdapterRecordT): string[] {
       problems.push("keyCodePattern must contain {{KEY}} or every generated keybinding maps to the same key");
     }
     if (a.clientSubpackage.trim() === "") problems.push("clientSubpackage must not be empty");
+  }
+  // Recipes: the datapack directory is the only version difference, so hold it in contentPaths.
+  const recipeTemplates = RECIPE_TEMPLATE_KEYS.filter((k) => k in a.templates);
+  if (recipeTemplates.length > 0) {
+    const missing = RECIPE_TEMPLATE_KEYS.filter((k) => !(k in a.templates));
+    if (missing.length > 0) problems.push(`adapter declares recipe support but is missing recipe template(s): ${missing.join(", ")}`);
+    const path = a.contentPaths.recipe;
+    if (path === undefined) problems.push("adapter declares recipe templates but contentPaths.recipe");
+    else {
+      if (!path.includes("{{id}}")) problems.push("contentPaths.recipe must contain {{id}} or every recipe overwrites the same file");
+      if (!path.includes("{{namespace}}")) problems.push("contentPaths.recipe must contain {{namespace}}");
+    }
+  }
+  // Advancements: same reasoning (advancements/ on 1.20.1, advancement/ on 1.21+).
+  if (ADVANCEMENT_TEMPLATE_KEYS.some((k) => k in a.templates)) {
+    const path = a.contentPaths.advancement;
+    if (path === undefined) problems.push("adapter declares an advancement template but no contentPaths.advancement");
+    else if (!path.includes("{{id}}")) problems.push("contentPaths.advancement must contain {{id}}");
+    const missingLang = ADVANCEMENT_LANG_KEYS.filter((k) => a.langKeys[k] === undefined);
+    if (missingLang.length > 0) problems.push(`adapter declares advancement support but is missing langKeys: ${missingLang.join(", ")}`);
   }
   for (const [key, wanted] of Object.entries(REQUIRED_PLACEHOLDERS)) {
     const body = a.templates[key];

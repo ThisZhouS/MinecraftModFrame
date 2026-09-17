@@ -97,6 +97,57 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
     expect(byId.get("neoforge-1.21.1")!.templates.screenClass).toContain("renderBackground(guiGraphics, mouseX, mouseY, partialTick);");
   });
 
+  it("writes recipes and advancements in each version's own JSON dialect", () => {
+    // Verified against vanilla datapack files inside the real jars: 1.21 renamed the item-stack key
+    // from "item" to "id" and flattened item predicates to a plain string; 1.20.1 keeps the object forms.
+    const adapters = new Map(listAdapters().map((a) => [a.id, a]));
+    const fileOf = (adapterId: string, suffix: string) => {
+      const p = planProject(spec, adapters.get(adapterId)!);
+      const f = p.files.find((x) => x.path.endsWith(suffix));
+      expect(f, adapterId + " should emit " + suffix).toBeDefined();
+      return JSON.parse(f!.content);
+    };
+
+    const fabShaped = fileOf("fabric-1.21.1", "recipe/charged_ruby.json");
+    expect(fabShaped.result).toEqual({ id: "examplemod:charged_ruby", count: 1 });
+    expect(fabShaped.key).toEqual({ R: { item: "examplemod:ruby" } });
+    expect(fileOf("fabric-1.21.1", "recipe/ruby_from_smelting.json").result).toEqual({ id: "examplemod:ruby" });
+    expect(fileOf("fabric-1.21.1", "advancement/root.json").display.icon).toEqual({ id: "examplemod:ruby", count: 1 });
+    expect(fileOf("fabric-1.21.1", "advancement/root.json").criteria.has_examplemod_ruby.conditions.items[0]).toBe("examplemod:ruby");
+
+    const forgeShaped = fileOf("forge-1.20.1", "recipes/charged_ruby.json");
+    expect(forgeShaped.result).toEqual({ item: "examplemod:charged_ruby", count: 1 });
+    expect(fileOf("forge-1.20.1", "recipes/ruby_from_smelting.json").result).toBe("examplemod:ruby");
+    expect(fileOf("forge-1.20.1", "advancements/root.json").display.icon).toEqual({ item: "examplemod:ruby" });
+    expect(fileOf("forge-1.20.1", "advancements/root.json").criteria.has_examplemod_ruby.conditions.items[0]).toEqual({
+      items: ["examplemod:ruby"],
+    });
+  });
+
+  it("uses the version's own datapack directory names for every data file", () => {
+    for (const a of listAdapters()) {
+      const p = a.id === adapter.id ? plan : planProject(spec, a);
+      const dirs = p.files.map((f) => f.path).filter((x) => x.includes("/data/"));
+      const singular = a.mcVersion.startsWith("1.21");
+      const expectedRecipes = singular ? "/data/examplemod/recipe/" : "/data/examplemod/recipes/";
+      const expectedAdv = singular ? "/data/examplemod/advancement/" : "/data/examplemod/advancements/";
+      expect(dirs.some((d) => d.includes(expectedRecipes)), a.id + " recipe dir").toBe(true);
+      expect(dirs.some((d) => d.includes(expectedAdv)), a.id + " advancement dir").toBe(true);
+      // never mix the two conventions in one plan
+      expect(dirs.some((d) => d.includes(singular ? "/recipes/" : "/recipe/")), a.id + " mixed recipe dirs").toBe(false);
+    }
+  });
+
+  it("emits parseable JSON for every generated data/resource file", () => {
+    for (const a of listAdapters()) {
+      const p = a.id === adapter.id ? plan : planProject(spec, a);
+      for (const f of p.files) {
+        if (!f.path.endsWith(".json")) continue;
+        expect(() => JSON.parse(f.content), a.id + ": " + f.path).not.toThrow();
+      }
+    }
+  });
+
   it("every adapter declares the build facts the generator relies on", () => {
     for (const a of listAdapters()) {
       expect(a.java).toBeGreaterThanOrEqual(8);

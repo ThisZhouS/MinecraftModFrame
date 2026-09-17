@@ -186,6 +186,109 @@ describe("ui.screens", () => {
   });
 });
 
+const CRAFT_SPEC = {
+  schemaVersion: 1,
+  mod: { modId: "examplemod", name: "Example Mod" },
+  target: { mcVersion: "1.21.1", loader: "fabric" },
+  content: {
+    items: [{ id: "ruby" }, { id: "charged_ruby" }],
+    blocks: [{ id: "ruby_ore" }],
+    recipes: [
+      { id: "charged_ruby", type: "crafting_shaped", pattern: ["RR", "RR"], key: { R: "ruby" }, result: "charged_ruby" },
+      { id: "ruby_from_smelting", type: "smelting", ingredient: "ruby_ore", result: "ruby", experience: 0.7 },
+      { id: "ruby_from_shapeless", type: "crafting_shapeless", ingredients: ["charged_ruby", "#minecraft:coals"], result: "ruby", count: 2 },
+      { id: "ruby_from_stonecutting", type: "stonecutting", ingredient: "ruby_ore", result: "ruby", count: 3 },
+    ],
+    advancements: [
+      { id: "root", hasItems: ["ruby"], icon: "ruby" },
+      { id: "charged", parent: "root", unlockRecipes: ["charged_ruby"], hasItems: ["charged_ruby"] },
+    ],
+  },
+};
+
+describe("content.recipes + content.advancements", () => {
+  const planFor = (spec: unknown) => planGeneration(parseSpecOrThrow(spec), makeFixtureAdapter());
+
+  it("emits one file per recipe and advancement, resolved through the adapter's paths", () => {
+    const p = planFor(CRAFT_SPEC);
+    const paths = p.files.map((f) => f.path);
+    expect(paths).toContain("src/main/resources/data/examplemod/recipe/charged_ruby.json");
+    expect(paths).toContain("src/main/resources/data/examplemod/recipe/ruby_from_smelting.json");
+    expect(paths).toContain("src/main/resources/data/examplemod/advancement/root.json");
+    expect(paths).toContain("src/main/resources/data/examplemod/advancement/charged.json");
+    for (const f of p.files.filter((x) => x.path.endsWith(".json"))) {
+      expect(() => JSON.parse(f.content), f.path).not.toThrow();
+    }
+  });
+
+  it("resolves declared ids to namespaced refs and passes resource locations through", () => {
+    const p = planFor(CRAFT_SPEC);
+    const shaped = JSON.parse(p.files.find((f) => f.path.endsWith("recipe/charged_ruby.json"))!.content);
+    expect(shaped.key.R).toEqual({ item: "examplemod:ruby" });
+    expect(shaped.pattern).toEqual(["RR", "RR"]);
+    const shapeless = JSON.parse(p.files.find((f) => f.path.endsWith("recipe/ruby_from_shapeless.json"))!.content);
+    expect(shapeless.ingredients).toEqual([{ item: "examplemod:charged_ruby" }, { tag: "minecraft:coals" }]);
+    expect(shapeless.result).toEqual({ item: "examplemod:ruby", count: 2 });
+  });
+
+  it("defaults cooking time per cooking type", () => {
+    const p = planFor(CRAFT_SPEC);
+    const smelt = JSON.parse(p.files.find((f) => f.path.endsWith("recipe/ruby_from_smelting.json"))!.content);
+    expect(smelt.cookingtime).toBe(200);
+    expect(smelt.experience).toBe(0.7);
+    expect(smelt.type).toBe("minecraft:smelting");
+  });
+
+  it("builds advancement criteria from unlocked recipes and watched items, plus rewards", () => {
+    const p = planFor(CRAFT_SPEC);
+    const charged = JSON.parse(p.files.find((f) => f.path.endsWith("advancement/charged.json"))!.content);
+    expect(Object.keys(charged.criteria).sort()).toEqual(["has_examplemod_charged_ruby", "unlock_charged_ruby"]);
+    expect(charged.criteria.unlock_charged_ruby.conditions.recipe).toBe("examplemod:charged_ruby");
+    expect(charged.rewards).toEqual({ recipes: ["examplemod:charged_ruby"] });
+    expect(charged.requirements).toEqual([["unlock_charged_ruby", "has_examplemod_charged_ruby"]]);
+    const lang = JSON.parse(p.files.find((f) => f.path.endsWith("lang/en_us.json"))!.content);
+    expect(lang["advancements.examplemod.charged.title"]).toBe("Charged");
+  });
+
+  it("derives a parent reference and rejects unknown parents", () => {
+    const ok = planFor(CRAFT_SPEC);
+    const charged = JSON.parse(ok.files.find((f) => f.path.endsWith("advancement/charged.json"))!.content);
+    expect(charged.parent).toBe("examplemod:root");
+    const bad = {
+      ...CRAFT_SPEC,
+      content: { ...CRAFT_SPEC.content, advancements: [{ id: "x", parent: "nope", hasItems: ["ruby"] }] },
+    };
+    expect(() => planFor(bad)).toThrowError(McmodError);
+  });
+
+  it("rejects unknown item references with an agent-fixable message", () => {
+    const bad = {
+      ...CRAFT_SPEC,
+      content: { ...CRAFT_SPEC.content, recipes: [{ id: "x", type: "smelting", ingredient: "not_declared", result: "ruby" }] },
+    };
+    expect(() => planFor(bad)).toThrowError(/not declared in this spec|is neither declared/);
+  });
+
+  it("rejects recipe shapes the schema cannot satisfy", () => {
+    const noKey = { ...CRAFT_SPEC, content: { ...CRAFT_SPEC.content, recipes: [{ id: "x", type: "crafting_shaped", pattern: ["RR"], result: "ruby" }] } };
+    const r = parseModSpec(noKey);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.formatted).toMatch(/content\.recipes\.0\.key/);
+
+    const strayKey = { ...CRAFT_SPEC, content: { ...CRAFT_SPEC.content, recipes: [{ id: "y", type: "smelting", ingredient: "ruby", result: "ruby", key: { R: "ruby" } }] } };
+    const r2 = parseModSpec(strayKey);
+    expect(r2.ok).toBe(false);
+  });
+
+  it("fails loudly on an adapter without recipe support", () => {
+    const a = makeFixtureAdapter();
+    for (const k of ["recipeShaped", "recipeShapeless", "recipeCooking", "recipeStonecutting", "advancement", "advancementItemPredicate", "advancementTagPredicate"]) {
+      delete (a.templates as Record<string, unknown>)[k];
+    }
+    expect(() => planGeneration(parseSpecOrThrow(CRAFT_SPEC), a)).toThrowError(McmodError);
+  });
+});
+
 describe("emitPlan", () => {
   it("dryRun writes nothing", async () => {
     const dir = await mkdtemp(join(tmpdir(), "mcmodkit-dry-"));

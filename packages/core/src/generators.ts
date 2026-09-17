@@ -280,6 +280,236 @@ function genUi(ctx: GenContext, javaDir: string): UiGenOut {
   return out;
 }
 
+interface RecipeGenOut {
+  files: FileEntry[];
+  /** recipe id -> produced resource location (feeds advancement icons). */
+  results: Map<string, string>;
+}
+
+function knownContentIds(ctx: GenContext): Set<string> {
+  return new Set<string>([
+    ...ctx.spec.content.items.map((i) => i.id),
+    ...ctx.spec.content.blocks.map((b) => b.id),
+  ]);
+}
+
+/**
+ * Accept a declared content id, or pass an explicit "ns:path" / "#ns:tag" through unchanged.
+ * Unknown bare ids are a spec error listing the known ids, so an agent can fix it unattended.
+ */
+function resolveItemRef(ctx: GenContext, ref: string, where: string): { value: string; isTag: boolean } {
+  if (ref.startsWith("#")) return { value: ref.slice(1), isTag: true };
+  if (ref.includes(":")) return { value: ref, isTag: false };
+  const known = knownContentIds(ctx);
+  if (!known.has(ref)) {
+    throw new McmodError(
+      "SPEC_INVALID",
+      where +
+        ': "' +
+        ref +
+        '" is neither declared in this spec nor an explicit resource location. Add it to content.items/blocks, or write "minecraft:' +
+        ref +
+        '" to mean a vanilla item.',
+      { where, ref, known: [...known] },
+    );
+  }
+  return { value: ctx.vars.namespace + ":" + ref, isTag: false };
+}
+
+/** Vanilla ingredient form: {item: ...} or {tag: ...} (identical on 1.20.1 and 1.21.1). */
+function ingredientJson(r: { value: string; isTag: boolean }): string {
+  return JSON.stringify(r.isTag ? { tag: r.value } : { item: r.value });
+}
+
+
+const COOKING_DEFAULT_TICKS: Record<string, number> = { smelting: 200, blasting: 100, smoking: 100, campfire_cooking: 600 };
+
+/**
+ * Recipe generator: one JSON file per recipe. The file format is stable across 1.20.1/1.21.1; only the
+ * datapack directory differs (recipes/ vs recipe/), which lives in contentPaths.recipe.
+ */
+function genRecipes(ctx: GenContext): RecipeGenOut {
+  const out: RecipeGenOut = { files: [], results: new Map() };
+  const recipes = ctx.spec.content.recipes;
+  if (recipes.length === 0) return out;
+  const a = ctx.adapter;
+  if (a.contentPaths.recipe === undefined || a.templates.recipeShaped === undefined) {
+    throw new McmodError(
+      "ADAPTER_INVALID",
+      `Adapter ${a.id} does not support content.recipes: it declares no recipe templates or paths`,
+      { adapterId: a.id },
+    );
+  }
+  const seen = new Set<string>();
+  for (const recipe of recipes) {
+    const where = `recipe "${recipe.id}"`;
+    if (seen.has(recipe.id)) throw new McmodError("SPEC_INVALID", "Duplicate recipe id " + recipe.id);
+    seen.add(recipe.id);
+    const result = resolveItemRef(ctx, recipe.result, `${where}.result`);
+    const groupLine = recipe.group === undefined ? "" : `\t"group": ${JSON.stringify(recipe.group)},\n`;
+    const base = {
+      ...ctx.vars,
+      id: recipe.id,
+      RECIPE_GROUP_LINE: groupLine,
+      RESULT_ITEM: result.value,
+      COUNT: String(recipe.count),
+      EXPERIENCE: String(recipe.experience),
+    };
+    let templateKey: string;
+    let vars: Record<string, string>;
+    if (recipe.type === "crafting_shaped") {
+      const pattern = recipe.pattern!;
+      const width = Math.max(...pattern.map((row) => row.length));
+      for (const row of pattern) {
+        if (row.length !== width) {
+          throw new McmodError("SPEC_INVALID", `${where}.pattern rows must all be the same length (got ${pattern.map((r) => r.length).join(", ")})`);
+        }
+      }
+      const keyObj: Record<string, unknown> = {};
+      for (const [ch, ref] of Object.entries(recipe.key!)) {
+        const r = resolveItemRef(ctx, ref, `${where}.key.${ch}`);
+        keyObj[ch] = r.isTag ? { tag: r.value } : { item: r.value };
+      }
+      templateKey = "recipeShaped";
+      vars = { ...base, PATTERN_JSON: JSON.stringify(pattern), KEY_JSON: JSON.stringify(keyObj) };
+    } else if (recipe.type === "crafting_shapeless") {
+      const ings = recipe.ingredients!.map((ref, i) => ingredientJson(resolveItemRef(ctx, ref, `${where}.ingredients[${i}]`)));
+      templateKey = "recipeShapeless";
+      vars = { ...base, INGREDIENTS_JSON: "[" + ings.join(", ") + "]" };
+    } else if (recipe.type === "stonecutting") {
+      const ing = ingredientJson(resolveItemRef(ctx, recipe.ingredient!, `${where}.ingredient`));
+      templateKey = "recipeStonecutting";
+      vars = { ...base, INGREDIENT_JSON: ing };
+    } else {
+      const ing = ingredientJson(resolveItemRef(ctx, recipe.ingredient!, `${where}.ingredient`));
+      templateKey = "recipeCooking";
+      vars = {
+        ...base,
+        RECIPE_TYPE: `minecraft:${recipe.type}`,
+        INGREDIENT_JSON: ing,
+        COOKING_TIME: String(recipe.cookingTime ?? COOKING_DEFAULT_TICKS[recipe.type] ?? 200),
+      };
+    }
+    const template = a.templates[templateKey];
+    if (template === undefined) {
+      throw new McmodError("ADAPTER_INVALID", `Adapter ${a.id} has no "${templateKey}" template but the spec asks for a ${recipe.type} recipe`, { adapterId: a.id, templateKey });
+    }
+    out.files.push({
+      path: renderPath(a.contentPaths.recipe, { ...ctx.vars, id: recipe.id }, "contentPaths.recipe"),
+      content: renderTemplate(template, vars, templateKey),
+      managed: true,
+      executable: false,
+      reason: `recipe:${recipe.id}`,
+    });
+    out.results.set(recipe.id, result.value);
+  }
+  return out;
+}
+
+interface AdvancementGenOut {
+  files: FileEntry[];
+  langEntries: Record<string, string>;
+}
+
+/**
+ * Advancement generator: criteria come from the recipes an advancement unlocks and/or the items it
+ * watches for; parents are referenced by id. The JSON shape is shared by 1.20.1 and 1.21.1 — only the
+ * datapack directory differs (advancements/ vs advancement/) and lives in contentPaths.advancement.
+ */
+function genAdvancements(ctx: GenContext, recipeResults: Map<string, string>): AdvancementGenOut {
+  const out: AdvancementGenOut = { files: [], langEntries: {} };
+  const advancements = ctx.spec.content.advancements;
+  if (advancements.length === 0) return out;
+  const a = ctx.adapter;
+  if (a.contentPaths.advancement === undefined || a.templates.advancement === undefined || a.langKeys.advancementTitle === undefined ||
+      a.templates.advancementItemPredicate === undefined ||
+      a.templates.advancementTagPredicate === undefined) {
+    throw new McmodError("ADAPTER_INVALID", `Adapter ${a.id} does not support content.advancements: it declares no advancement template, path or lang keys`, { adapterId: a.id });
+  }
+  const declared = new Set(advancements.map((x) => x.id));
+  const seen = new Set<string>();
+  for (const adv of advancements) {
+    const where = `advancement "${adv.id}"`;
+    if (seen.has(adv.id)) throw new McmodError("SPEC_INVALID", "Duplicate advancement id " + adv.id);
+    seen.add(adv.id);
+    const titleKey = renderTemplate(a.langKeys.advancementTitle, { namespace: ctx.vars.namespace!, id: adv.id }, "langKeys.advancementTitle");
+    const descKey = renderTemplate(a.langKeys.advancementDescription!, { namespace: ctx.vars.namespace!, id: adv.id }, "langKeys.advancementDescription");
+    out.langEntries[titleKey] = adv.title ?? toDisplayName(adv.id);
+    out.langEntries[descKey] = adv.description ?? toDisplayName(adv.id) + " — generated by mcmodkit";
+    let parentLine = "";
+    if (adv.parent !== undefined) {
+      const parent = adv.parent.includes(":") ? adv.parent : declared.has(adv.parent) ? `${ctx.vars.namespace}:${adv.parent}` : undefined;
+      if (parent === undefined) {
+        throw new McmodError("SPEC_INVALID", `${where}.parent "${adv.parent}" is neither a declared advancement in this spec nor an explicit resource location like "minecraft:story/root"`);
+      }
+      parentLine = `\t"parent": ${JSON.stringify(parent)},\n`;
+    }
+    const backgroundLine = adv.parent === undefined && adv.background !== undefined ? `\t\t"background": ${JSON.stringify(adv.background)},\n` : "";
+    const fallbackIcon = ctx.spec.content.items[0] === undefined ? undefined : `${ctx.vars.namespace}:${ctx.spec.content.items[0].id}`;
+    const iconRef = adv.icon ?? (adv.unlockRecipes.length > 0 ? recipeResults.get(adv.unlockRecipes[0]!) : undefined) ?? fallbackIcon;
+    if (iconRef === undefined) {
+      throw new McmodError("SPEC_INVALID", `${where}: cannot infer an icon — set icon, or unlock a recipe, or declare an item`);
+    }
+    const icon = resolveItemRef(ctx, iconRef, `${where}.icon`);
+    const criteria: Record<string, unknown> = {};
+    for (const rid of adv.unlockRecipes) {
+      if (!recipeResults.has(rid)) {
+        throw new McmodError("SPEC_INVALID", `${where}.unlockRecipes: "${rid}" is not a recipe declared in this spec`, { id: adv.id, recipe: rid });
+      }
+      criteria[`unlock_${rid}`] = { trigger: "minecraft:recipe_unlocked", conditions: { recipe: `${ctx.vars.namespace}:${rid}` } };
+    }
+    // The item-predicate JSON changed in 1.21 (object list -> plain string), so the fragment comes
+    // from an adapter template and is parsed here, which also proves the template renders valid JSON.
+    adv.hasItems.forEach((ref, i) => {
+      const r = resolveItemRef(ctx, ref, `${where}.hasItems[${i}]`);
+      const predicateKey = r.isTag ? "advancementTagPredicate" : "advancementItemPredicate";
+      const predicateTemplate = a.templates[predicateKey];
+      if (predicateTemplate === undefined) {
+        throw new McmodError("ADAPTER_INVALID", `Adapter ${a.id} has no "${predicateKey}" template required for advancement item predicates`, { adapterId: a.id });
+      }
+      const predicateText = renderTemplate(predicateTemplate, { ...ctx.vars, ITEM_ID: r.value, TAG_ID: r.value }, predicateKey);
+      let predicate: unknown;
+      try {
+        predicate = JSON.parse(predicateText);
+      } catch {
+        throw new McmodError("ADAPTER_INVALID", `Adapter ${a.id} template "${predicateKey}" must render valid JSON, got: ${predicateText}`, { adapterId: a.id, templateKey: predicateKey });
+      }
+      criteria["has_" + r.value.replace(/[:/]/g, "_")] = { trigger: "minecraft:inventory_changed", conditions: { items: [predicate] } };
+    });
+    const rewardsLine =
+      adv.unlockRecipes.length === 0
+        ? ""
+        : `\t"rewards": ${JSON.stringify({ recipes: adv.unlockRecipes.map((rid) => `${ctx.vars.namespace}:${rid}`) })},\n`;
+    const names = Object.keys(criteria);
+    out.files.push({
+      path: renderPath(a.contentPaths.advancement, { ...ctx.vars, id: adv.id }, "contentPaths.advancement"),
+      content: renderTemplate(
+        a.templates.advancement,
+        {
+          ...ctx.vars,
+          ADV_PARENT_LINE: parentLine,
+          ADV_BACKGROUND_LINE: backgroundLine,
+          ADV_ICON_ITEM: icon.value,
+          ADV_REWARDS_LINE: rewardsLine,
+          ADV_TITLE_JSON: JSON.stringify({ translate: titleKey }),
+          ADV_DESCRIPTION_JSON: JSON.stringify({ translate: descKey }),
+          ADV_FRAME: adv.frame,
+          ADV_SHOW_TOAST: String(adv.showToast),
+          ADV_ANNOUNCE_TO_CHAT: String(adv.announceToChat),
+          ADV_HIDDEN: String(adv.hidden),
+          ADV_CRITERIA_JSON: JSON.stringify(criteria),
+          ADV_REQUIREMENTS_JSON: JSON.stringify([names]),
+        },
+        "advancement",
+      ),
+      managed: true,
+      executable: false,
+      reason: `advancement:${adv.id}`,
+    });
+  }
+  return out;
+}
+
 export interface PlanOptions {
   /**
    * Resolve an adapter asset key to an absolute file path. Required when the adapter declares
@@ -362,13 +592,17 @@ export function planGeneration(spec: ModSpecT, adapter: AdapterRecordT, options:
   });
 
   const ui = genUi(ctx, javaDir);
-  files.push(...ui.files);
+  const recipes = genRecipes(ctx);
+  // Advancements consume recipe ids so they can reference "the recipe this unlocks" and derive an icon.
+  const advancements = genAdvancements(ctx, recipes.results);
+  files.push(...ui.files, ...recipes.files, ...advancements.files);
 
   const langObj: Record<string, string> = {
     [renderTemplate(adapter.langKeys.itemGroup, { namespace: ctx.vars.namespace! }, "langKeys.itemGroup")]: ctx.vars.modName!,
     ...items.langEntries,
     ...blocks.langEntries,
     ...ui.langEntries,
+    ...advancements.langEntries,
   };
   files.push({
     path: renderPath(adapter.contentPaths.lang, ctx.vars, "contentPaths.lang"),

@@ -29,6 +29,8 @@
 | FR-13 | 产物可脱离本框架生存（自带 wrapper、README、构建说明） | 无全局 gradle 环境下 `gradlew.bat build` 通过 | ✅ 已编译验证 |
 | FR-14 | UI 生成：按 Spec 生成游戏内 Screen（标题/尺寸/文本行），并按声明生成打开它的按键绑定与客户端入口 | 生成 `client/<Mod><Id>Screen.java` + `client/<Mod>Client.java`，语言键齐全 | ✅ Fabric/Forge 已编译验证 |
 | FR-15 | UI 参数化：尺寸、每行文本、按键字母都是 Spec 数据，改 Spec 重生成即改 UI | `ui.screens[].width/height/lines/key`；缺省时取默认值 | ✅ 单测覆盖 |
+| FR-16 | 生成配方：有序/无序合成、熔炼、高炉、烟熏、营火、切石；引用本 mod 内容或原版物品；按版本写出正确的 JSON 方言与数据包目录 | 生成 jar 内 `data/<ns>/recipe(s)/*.json`，与原版样本逐字段一致 | ✅ 两版编译验证 + 方言护栏 |
+| FR-17 | 生成进度：根/子进度树、图标、判据（解锁配方 / 持有物品）、`rewards.recipes` 配方书解锁、语言键 | 生成 `data/<ns>/advancement(s)/*.json` + lang | ✅ 两版编译验证 |
 
 ## 3. 非功能需求
 

@@ -40,9 +40,111 @@ export const ModMetaSpec = z.object({
   license: z.string().optional(),
 }).strict();
 
+/**
+ * An item/block reference inside a recipe: either a content id declared in this spec, or an explicit
+ * resource location ("minecraft:stick", "#c:ingots" for a tag). The declared-id case is validated by
+ * the generator, which is the only place that knows which ids exist.
+ */
+export const ItemRefSpec = z
+  .string()
+  .min(1)
+  .regex(/^[#]?[a-z0-9_.:-]+$/, "item reference must be a content id or a resource location like minecraft:stick");
+
+export const RECIPE_TYPES = [
+  "crafting_shaped",
+  "crafting_shapeless",
+  "smelting",
+  "blasting",
+  "smoking",
+  "campfire_cooking",
+  "stonecutting",
+] as const;
+export const RecipeType = z.enum(RECIPE_TYPES);
+export type RecipeTypeT = z.infer<typeof RecipeType>;
+
+export const RecipeSpec = z
+  .object({
+    /** File name and stable identity of the recipe. */
+    id: idField("recipe"),
+    type: RecipeType,
+    /** The produced item (content id or resource location). */
+    result: ItemRefSpec,
+    /** How many items the recipe produces. */
+    count: z.number().int().min(1).max(64).default(1),
+    /** Recipe-book group; optional. */
+    group: z.string().min(1).optional(),
+    /** crafting_shaped only: rows of key characters, e.g. ["RR", "RR"]. */
+    pattern: z.array(z.string().min(1)).min(1).max(3).optional(),
+    /** crafting_shaped only: key character -> item reference. */
+    key: z.record(z.string().regex(/^[A-Za-z]$/), ItemRefSpec).optional(),
+    /** crafting_shapeless only: the unordered ingredient list. */
+    ingredients: z.array(ItemRefSpec).min(1).max(9).optional(),
+    /** Cooking and stonecutting: the single input. */
+    ingredient: ItemRefSpec.optional(),
+    /** Cooking types only: experience granted. */
+    experience: z.number().min(0).max(100).default(0.1),
+    /** Cooking types only: ticks; default 200 for smelting, 100 for blasting/smoking. */
+    cookingTime: z.number().int().min(1).max(72000).optional(),
+  })
+  .strict()
+  .superRefine((r, ctx) => {
+    const fail = (field: string, message: string) => ctx.addIssue({ code: "custom", path: [field], message });
+    const shaped = r.type === "crafting_shaped";
+    const shapeless = r.type === "crafting_shapeless";
+    const cooking = r.type === "smelting" || r.type === "blasting" || r.type === "smoking" || r.type === "campfire_cooking";
+    if (shaped && r.pattern === undefined) fail("pattern", "crafting_shaped requires pattern (e.g. [\"RR\", \"RR\"])");
+    if (shaped && r.key === undefined) fail("key", "crafting_shaped requires key (e.g. { \"R\": \"ruby\" })");
+    if (shapeless && r.ingredients === undefined) fail("ingredients", "crafting_shapeless requires ingredients");
+    if (!shaped && r.pattern !== undefined) fail("pattern", "pattern is only valid for crafting_shaped");
+    if (!shaped && r.key !== undefined) fail("key", "key is only valid for crafting_shaped");
+    if (!shapeless && r.ingredients !== undefined) fail("ingredients", "ingredients is only valid for crafting_shapeless");
+    if ((cooking || r.type === "stonecutting") && r.ingredient === undefined) {
+      fail("ingredient", r.type + " requires ingredient");
+    }
+    if (shaped && r.pattern !== undefined && r.key !== undefined) {
+      for (const ch of r.pattern.join("")) {
+        if (ch !== " " && !(ch in r.key)) fail("pattern", "pattern uses character \"" + ch + "\" that is missing from key");
+      }
+    }
+  });
+
+export const AdvancementSpec = z
+  .object({
+    id: idField("advancement"),
+    /** Shown in the advancement toast; defaults derived from the id. */
+    title: z.string().min(1).optional(),
+    description: z.string().min(1).optional(),
+    /** Parent advancement (id of another advancement in this spec) or an explicit resource location. */
+    parent: z.string().min(1).optional(),
+    /** Root advancements only: tab background texture, e.g. minecraft:textures/block/stone.png. */
+    background: z.string().min(1).optional(),
+    /** Icon item; defaults to the result of the first unlocked recipe, else the first item of the mod. */
+    icon: ItemRefSpec.optional(),
+    /** Declared recipe ids whose recipe-book entry this advancement unlocks. */
+    unlockRecipes: z.array(z.string().min(1)).default([]),
+    /** Items in the inventory that grant the advancement. */
+    hasItems: z.array(ItemRefSpec).default([]),
+    frame: z.enum(["task", "goal", "challenge"]).default("task"),
+    announceToChat: z.boolean().default(true),
+    showToast: z.boolean().default(true),
+    hidden: z.boolean().default(false),
+  })
+  .strict()
+  .superRefine((a, ctx) => {
+    if (a.unlockRecipes.length === 0 && a.hasItems.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["unlockRecipes"],
+        message: "an advancement needs at least one trigger: unlockRecipes and/or hasItems",
+      });
+    }
+  });
+
 export const ContentSpec = z.object({
   items: z.array(ItemSpec).default([]),
   blocks: z.array(BlockSpec).default([]),
+  recipes: z.array(RecipeSpec).default([]),
+  advancements: z.array(AdvancementSpec).default([]),
 }).strict();
 
 /** One generated in-game screen. Layout numbers are data so agents can adjust UI without editing Java. */
@@ -70,7 +172,7 @@ export const ModSpec = z.object({
     mcVersion: z.string().regex(MC_VERSION_RE, "mcVersion must look like 1.21.1"),
     loader: LoaderKind,
   }).strict(),
-  content: ContentSpec.default({ items: [], blocks: [] }),
+  content: ContentSpec.default({ items: [], blocks: [], recipes: [], advancements: [] }),
   ui: UiSpec.default({ screens: [] }),
 }).strict();
 

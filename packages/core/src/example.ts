@@ -1,11 +1,15 @@
+import { ModSpec } from "./spec.js";
 import type { ModSpecT } from "./spec.js";
 
 /**
  * Canonical example spec shared by CLI (mcmod example), MCP (example_spec) and the HTTP API.
  * Keeping it here means all three surfaces demo exactly what the schema accepts.
+ *
+ * The literal below is the *input* shape (schema defaults omitted); ModSpec.parse fills them in, so the
+ * example can never drift from the schema and stays terse for agents to copy.
  */
 export function exampleSpec(): ModSpecT {
-  return {
+  return ModSpec.parse({
     schemaVersion: 1,
     mod: {
       modId: "examplemod",
@@ -25,6 +29,33 @@ export function exampleSpec(): ModSpecT {
         { id: "ruby_ore", hardness: 3.0, resistance: 9.0, tool: "pickaxe" },
         { id: "deepslate_ruby_ore", hardness: 4.5, resistance: 12.0, tool: "pickaxe" },
       ],
+      recipes: [
+        // 2x2 of rubies -> one charged ruby
+        { id: "charged_ruby", type: "crafting_shaped", pattern: ["RR", "RR"], key: { R: "ruby" }, result: "charged_ruby" },
+        // ore processing: smelt / blast ruby ore into a ruby
+        { id: "ruby_from_smelting", type: "smelting", ingredient: "ruby_ore", result: "ruby", experience: 0.7, cookingTime: 200 },
+        { id: "ruby_from_blasting", type: "blasting", ingredient: "ruby_ore", result: "ruby", experience: 0.7, cookingTime: 100 },
+        // shapeless: two charged rubies compress back into ... a ruby (demonstrates the shapeless form)
+        { id: "ruby_from_charged", type: "crafting_shapeless", ingredients: ["charged_ruby", "charged_ruby"], result: "ruby", count: 2, group: "ruby" },
+      ],
+      advancements: [
+        {
+          id: "root",
+          title: "Ruby Rush",
+          description: "Obtain your first ruby",
+          background: "minecraft:textures/block/stone.png",
+          hasItems: ["ruby"],
+          icon: "ruby",
+          frame: "task",
+        },
+        {
+          id: "charged",
+          title: "Charged Up",
+          description: "Craft a charged ruby",
+          parent: "root",
+          unlockRecipes: ["charged_ruby"],
+        },
+      ],
     },
     ui: {
       screens: [
@@ -42,5 +73,5 @@ export function exampleSpec(): ModSpecT {
         },
       ],
     },
-  };
+  });
 }
