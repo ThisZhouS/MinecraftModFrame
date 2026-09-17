@@ -37,6 +37,11 @@ export const LangKeysSpec = z.object({
   item: z.string(),
   block: z.string(),
   itemGroup: z.string(),
+  /** Optional: required only by adapters that support ui.screens. */
+  screenTitle: z.string().optional(),
+  screenLine: z.string().optional(),
+  keybind: z.string().optional(),
+  keybindCategory: z.string().optional(),
 });
 
 /** Template keys the built-in generators require. */
@@ -62,6 +67,22 @@ export const REQUIRED_TEMPLATE_KEYS = [
   "mineableTag",
 ] as const;
 
+/**
+ * Template keys the UI generator needs. They are OPTIONAL in the contract so minimal adapters stay
+ * small: an adapter either declares all of them (screen support) or none, and lint enforces that.
+ */
+export const UI_TEMPLATE_KEYS = [
+  "screenClass",
+  "screenLineDraw",
+  "clientBootstrap",
+  "keybindField",
+  "keybindRegister",
+  "screenOpenStatement",
+] as const;
+
+/** Language keys the UI generator needs alongside UI_TEMPLATE_KEYS. */
+export const UI_LANG_KEYS = ["screenTitle", "screenLine", "keybind", "keybindCategory"] as const;
+
 export const AdapterRecord = z.object({
   /** e.g. "fabric-1.21.1" */
   id: z.string().regex(/^(fabric|neoforge|forge)-\d+\.\d+(\.\d+)?$/),
@@ -76,6 +97,13 @@ export const AdapterRecord = z.object({
   mainClassSimpleName: z.string().default("ModMain"),
   /** Gradle distribution used by the generated wrapper. */
   gradleWrapperVersion: z.string().min(1),
+  /**
+   * Expression turning a screen's single-letter key into a key code, e.g.
+   * "org.lwjgl.glfw.GLFW.GLFW_KEY_{{KEY}}". Lives here because the input API differs per version.
+   */
+  keyCodePattern: z.string().default("org.lwjgl.glfw.GLFW.GLFW_KEY_{{KEY}}"),
+  /** Sub-package holding client-only classes (screens, key handling). */
+  clientSubpackage: z.string().default("client"),
   /** Extra build facts flattened into vars as {{gradle_<key>}} (versions, plugin ids, ...). */
   gradle: z.record(z.string(), z.unknown()),
   /** group key -> constant expression usable inside the registration template. */
@@ -131,6 +159,13 @@ const REQUIRED_PLACEHOLDERS: Record<string, string[]> = {
   mineableTag: ["{{VALUES}}"],
   itemsRegistryClass: ["{{ITEM_REGISTRATIONS}}"],
   blocksRegistryClass: ["{{BLOCK_REGISTRATIONS}}"],
+  // UI templates (present only on screen-capable adapters).
+  screenClass: ["{{SCREEN_CLASS}}", "{{SCREEN_TITLE_KEY}}", "{{SCREEN_LINE_DRAWS}}"],
+  screenLineDraw: ["{{LINE_KEY}}", "{{LINE_N}}"],
+  clientBootstrap: ["{{KEYBIND_FIELDS}}", "{{KEYBIND_REGISTRATIONS}}", "{{SCREEN_OPEN_BODY}}"],
+  keybindField: ["{{KEYBIND_CONST}}", "{{KEY_CODE}}", "{{KEYBIND_LANG_KEY}}"],
+  keybindRegister: ["{{KEYBIND_CONST}}"],
+  screenOpenStatement: ["{{KEYBIND_CONST}}", "{{SCREEN_CLASS}}"],
 };
 
 /** Static sanity checks beyond the schema: referenced template keys must exist and stay wired up. */
@@ -154,6 +189,22 @@ export function lintAdapter(a: AdapterRecordT): string[] {
   }
   if (a.templates.tabEntryLineBlock && !tabBlockLine.includes(blocksClass)) {
     problems.push(`tabEntryLineBlock must reference the emitted registry class "${blocksClass}"`);
+  }
+  // Screen support is all-or-nothing: half an implementation would emit Java that cannot compile.
+  const uiTemplates = UI_TEMPLATE_KEYS.filter((k) => k in a.templates);
+  if (uiTemplates.length > 0 && uiTemplates.length !== UI_TEMPLATE_KEYS.length) {
+    const missing = UI_TEMPLATE_KEYS.filter((k) => !(k in a.templates));
+    problems.push(`adapter declares screen support but is missing UI template(s): ${missing.join(", ")}`);
+  }
+  if (uiTemplates.length > 0) {
+    const missingLang = UI_LANG_KEYS.filter((k) => a.langKeys[k] === undefined);
+    if (missingLang.length > 0) {
+      problems.push(`adapter declares screen support but is missing langKeys: ${missingLang.join(", ")}`);
+    }
+    if (!a.keyCodePattern.includes("{{KEY}}")) {
+      problems.push("keyCodePattern must contain {{KEY}} or every generated keybinding maps to the same key");
+    }
+    if (a.clientSubpackage.trim() === "") problems.push("clientSubpackage must not be empty");
   }
   for (const [key, wanted] of Object.entries(REQUIRED_PLACEHOLDERS)) {
     const body = a.templates[key];

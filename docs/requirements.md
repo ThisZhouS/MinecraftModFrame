@@ -27,6 +27,8 @@
 | FR-11 | 生成阶段**零网络**：所有版本事实来自本地适配器数据 | 断网可生成（仅首次 gradle 构建需联网） | ✅ |
 | FR-12 | 智能体可查询版本知识：列出目标、读取某适配器的构建事实与陷阱注记 | `mcmod adapter fabric-1.21.1`（`--templates` 可取模板） | ✅ |
 | FR-13 | 产物可脱离本框架生存（自带 wrapper、README、构建说明） | 无全局 gradle 环境下 `gradlew.bat build` 通过 | ✅ 已编译验证 |
+| FR-14 | UI 生成：按 Spec 生成游戏内 Screen（标题/尺寸/文本行），并按声明生成打开它的按键绑定与客户端入口 | 生成 `client/<Mod><Id>Screen.java` + `client/<Mod>Client.java`，语言键齐全 | ✅ Fabric/Forge 已编译验证 |
+| FR-15 | UI 参数化：尺寸、每行文本、按键字母都是 Spec 数据，改 Spec 重生成即改 UI | `ui.screens[].width/height/lines/key`；缺省时取默认值 | ✅ 单测覆盖 |
 
 ## 3. 非功能需求
 

@@ -73,6 +73,30 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
     }
   });
 
+  it("every adapter generates the UI slice from the example spec", () => {
+    for (const a of listAdapters()) {
+      const p = a.id === adapter.id ? plan : planProject(spec, a);
+      const paths = p.files.map((f) => f.path);
+      expect(paths, `${a.id} should emit a client bootstrap`).toContain("src/main/java/com/examplemod/client/ModMainClient.java");
+      expect(paths, `${a.id} should emit the screen class`).toContain("src/main/java/com/examplemod/client/ModMainGuideScreen.java");
+      const boot = p.files.find((f) => f.path.endsWith("ModMainClient.java"))!.content;
+      expect(boot).toContain("KEY_GUIDE");
+      expect(boot).toContain("ModMainGuideScreen");
+      const lang = JSON.parse(p.files.find((f) => f.path.endsWith("lang/en_us.json"))!.content);
+      expect(lang["examplemod.screen.guide.title"]).toBe("Example Mod Guide");
+      expect(lang["examplemod.key.guide"]).toBe("Open Example Mod Guide");
+    }
+  });
+
+  it("keeps the renderBackground signature version-correct in screen templates", () => {
+    // Verified with javap against the real mapped jars: 1.20.1 takes (GuiGraphics), 1.21.x takes
+    // (GuiGraphics, int, int, float). Getting this wrong is a compile error, so pin it here too.
+    const byId = new Map(listAdapters().map((a) => [a.id, a]));
+    expect(byId.get("forge-1.20.1")!.templates.screenClass).toContain("renderBackground(guiGraphics);");
+    expect(byId.get("fabric-1.21.1")!.templates.screenClass).toContain("renderBackground(guiGraphics, mouseX, mouseY, partialTick);");
+    expect(byId.get("neoforge-1.21.1")!.templates.screenClass).toContain("renderBackground(guiGraphics, mouseX, mouseY, partialTick);");
+  });
+
   it("every adapter declares the build facts the generator relies on", () => {
     for (const a of listAdapters()) {
       expect(a.java).toBeGreaterThanOrEqual(8);

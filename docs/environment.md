@@ -75,7 +75,8 @@ Get-Command node,npm,pnpm,python,git,java,gradle,mvn,docker | Format-Table Sourc
 | --- | --- | --- | --- |
 | `maven.minecraftforge.net`（Forge 官方 maven） | ✅ 200 | ✅ 200（实测拉取 userdev jar 3 MB） | Forge 线**可完整编译验证** |
 | `api.adoptium.net` → GitHub release assets | ✅ | — | 可取得 Temurin **JDK 17.0.20.1**（本机因此具备 Java 17 编译能力） |
-| `github.com` | ❌ 连接超时（本轮重下 Gradle 9.5.1 时失败） | — | `services.gradle.org` 的部分发行版重定向到 GitHub ⇒ 重下 Gradle 可能失败；应保留本地发行版副本 |
+| `github.com` | ❌ 连接超时 | — | `services.gradle.org` 的部分发行版重定向到 GitHub ⇒ 从官方源重下 Gradle 会失败；应保留本地发行版副本 |
+| `mirrors.cloud.tencent.com/gradle/` | ✅ 206（支持断点/范围请求） | — | **Gradle 发行版的可用镜像**：`curl -L -o gradle-9.5.1-bin.zip https://mirrors.cloud.tencent.com/gradle/gradle-9.5.1-bin.zip`（阿里云镜像该路径 404） |
 | `maven.neoforged.net` | ⚠️ 连接重置 | ❌ SSL 握手终止 | NeoForge 线仍阻塞（见验收报告 §7.1） |
 
 ### 本轮取得的工具链（临时，位于 Temp/tools，不入库）

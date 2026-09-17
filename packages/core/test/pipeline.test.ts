@@ -43,6 +43,26 @@ describe("lintAdapter", () => {
     expect(problems).toMatch(/missing required template "blockState"/);
     expect(problems).toMatch(/tabEntryLineItem/);
   });
+  it("rejects half-implemented screen support", () => {
+    const a = makeFixtureAdapter();
+    delete (a.templates as Record<string, unknown>).keybindRegister;
+    expect(lintAdapter(a).join("\n")).toMatch(/missing UI template\(s\): keybindRegister/);
+
+    const b = makeFixtureAdapter();
+    delete (b.langKeys as Record<string, unknown>).screenTitle;
+    expect(lintAdapter(b).join("\n")).toMatch(/missing langKeys: screenTitle/);
+
+    const c = makeFixtureAdapter();
+    c.keyCodePattern = "Key.K";
+    expect(lintAdapter(c).join("\n")).toMatch(/keyCodePattern must contain \{\{KEY\}\}/);
+  });
+  it("adapters that declare no UI templates are still clean (UI is optional)", () => {
+    const a = makeFixtureAdapter();
+    for (const k of ["screenClass", "screenLineDraw", "clientBootstrap", "keybindField", "keybindRegister", "screenOpenStatement"]) {
+      delete (a.templates as Record<string, unknown>)[k];
+    }
+    expect(lintAdapter(a)).toEqual([]);
+  });
 });
 
 describe("planGeneration", () => {
@@ -90,6 +110,79 @@ describe("planGeneration", () => {
       content: { items: [{ id: "ruby" }], blocks: [{ id: "ruby" }] },
     });
     expect(() => planGeneration(spec, makeFixtureAdapter())).toThrowError(McmodError);
+  });
+});
+
+const UI_SPEC = {
+  schemaVersion: 1,
+  mod: { modId: "examplemod", name: "Example Mod" },
+  target: { mcVersion: "1.21.1", loader: "fabric" },
+  content: { items: [], blocks: [] },
+  ui: {
+    screens: [
+      { id: "guide", title: "Guide", key: "K", width: 200, height: 120, lines: ["first", "second"] },
+      { id: "credits", lines: ["no key bound here"] },
+    ],
+  },
+};
+
+describe("ui.screens", () => {
+  it("emits one screen class per screen plus a client bootstrap and lang keys", () => {
+    const p = planGeneration(parseSpecOrThrow(UI_SPEC), makeFixtureAdapter());
+    const paths = p.files.map((f) => f.path);
+    expect(paths).toContain("com/examplemod/client/ModMainGuideScreen.java");
+    expect(paths).toContain("com/examplemod/client/ModMainCreditsScreen.java");
+    expect(paths).toContain("com/examplemod/client/ModMainClient.java");
+
+    const screen = p.files.find((f) => f.path.endsWith("ModMainGuideScreen.java"))!.content;
+    expect(screen).toContain("class ModMainGuideScreen");
+    expect(screen).toContain("static final int W = 200;");
+    expect(screen).toContain("draw(screen.examplemod.guide.line.1, line 1);");
+    expect(screen).not.toContain("{{");
+
+    // Only the screen that declared a key is bound and opened.
+    const bootstrap = p.files.find((f) => f.path.endsWith("ModMainClient.java"))!.content;
+    expect(bootstrap).toContain("register(KEY_GUIDE);");
+    expect(bootstrap).toContain("open(KEY_GUIDE, ModMainGuideScreen);");
+    expect(bootstrap).not.toContain("Credits");
+
+    const lang = JSON.parse(p.files.find((f) => f.path.endsWith("lang/en_us.json"))!.content);
+    expect(lang["screen.examplemod.guide.title"]).toBe("Guide");
+    expect(lang["screen.examplemod.guide.line.2"]).toBe("second");
+    expect(lang["screen.examplemod.credits.title"]).toBe("Credits");
+    expect(lang["key.examplemod.guide"]).toBe("Open Guide");
+    expect(lang["key.categories.examplemod"]).toBe("Example Mod");
+  });
+
+  it("omits the client bootstrap when no screen binds a key", () => {
+    const spec = parseSpecOrThrow({ ...UI_SPEC, ui: { screens: [{ id: "readme", lines: ["x"] }] } });
+    const p = planGeneration(spec, makeFixtureAdapter());
+    expect(p.files.some((f) => f.path.endsWith("ModMainClient.java"))).toBe(false);
+    expect(p.files.some((f) => f.path.endsWith("ModMainReadmeScreen.java"))).toBe(true);
+  });
+
+  it("fails loudly on an adapter without screen support", () => {
+    const a = makeFixtureAdapter();
+    for (const k of ["screenClass", "screenLineDraw", "clientBootstrap", "keybindField", "keybindRegister", "screenOpenStatement"]) {
+      delete (a.templates as Record<string, unknown>)[k];
+    }
+    expect(() => planGeneration(parseSpecOrThrow(UI_SPEC), a)).toThrowError(McmodError);
+  });
+
+  it("rejects a malformed key in the spec (agent-fixable error)", () => {
+    const r = parseModSpec({ ...UI_SPEC, ui: { screens: [{ id: "guide", key: "kk" }] } });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.formatted).toMatch(/ui\.screens\.0\.key/);
+  });
+
+  it("applies UI defaults (width/height/lines) so agents can omit them", () => {
+    const r = parseModSpec({ ...UI_SPEC, ui: { screens: [{ id: "mini" }] } });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.spec.ui.screens[0]!.width).toBe(220);
+      expect(r.spec.ui.screens[0]!.height).toBe(140);
+      expect(r.spec.ui.screens[0]!.lines).toEqual([]);
+    }
   });
 });
 

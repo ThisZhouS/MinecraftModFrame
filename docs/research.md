@@ -46,6 +46,8 @@
 | 「Forge 已止步」的第二次证伪 | ✅ Forge 1.20.1 线仍在更新（promotions_slim.json：recommended **47.4.10**、latest **47.4.23**），且官方 MDK 与 maven 均活跃 |
 | 1.20.1 数据包目录是**复数** | ✅ 与 1.21 相反：`data/<ns>/loot_tables/blocks/`、`data/minecraft/tags/blocks/mineable/`（1.21 才改单数）。已由适配器数据层承载，引擎零分支；两个版本线的 jar 均已由真实编译器验证 |
 | Forge 1.20.1 真编译 | ✅ **BUILD SUCCESSFUL**（Temurin JDK 17 + Gradle 8.8 + ForgeGradle 6 + Mojmap），产出经 `reobfJar` 的 jar —— 详见 acceptance-report §5 |
+| 客户端/UI API 矩阵（由 `javap` 对**两个版本的真实映射 jar**取证） | ✅ 相同：`Screen#init()`、`Screen#render(GuiGraphics,int,int,float)`、`Screen.font/minecraft` 字段、`Button.builder(Component,OnPress)`、`Component.translatable`、`new KeyMapping(String,int,String)`、`isDown/consumeClick`、`GuiGraphics.drawString(Font,String,int,int,int)`、`drawCenteredString(Font,Component,…)`。**不同**：`Screen#renderBackground` 在 1.20.1 收 `(GuiGraphics)`，在 1.21.x 收 `(GuiGraphics,int,int,float)` —— 该差异已分叉进各自适配器模板（并有测试钉住） |
+| 加载器客户端引导方式（各家不同） | ✅ Fabric：`ClientModInitializer` + `KeyBindingHelper.registerKeyBinding` + `ClientTickEvents.END_CLIENT_TICK` + `fabric.mod.json` 的 `client` entrypoint；Forge 1.20.1：`@Mod.EventBusSubscriber(Bus.MOD)` + `RegisterKeyMappingsEvent.register` + `TickEvent.ClientTickEvent`；NeoForge 1.21.1：`@EventBusSubscriber` + 同名事件（该侧本机无法离线校验，原因见 acceptance-report §7.1） |
 | 版本陷阱（本轮由编译器/`javap` 取证） | ✅ ① `ItemLike` 在 **1.20.1 与 1.21.1 均为** `net.minecraft.world.level.ItemLike`（`net.minecraft.world.item.ItemLike` 两个版本都不存在）——曾被我误判为「1.20.5 迁移」，由 `javap` 对真实映射 jar 取证纠正；② 1.20.1 Mojmap 的 `ResourceLocation(String,String)` 构造器已 `forRemoval`，应使用 `ResourceLocation.fromNamespaceAndPath`（1.20.1 即存在） |
 
 ## 结论 / Conclusion

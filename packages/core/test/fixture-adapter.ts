@@ -16,6 +16,8 @@ export function makeFixtureAdapter(): AdapterRecordT {
     basePackagePattern: "com.{{modId}}",
     mainClassSimpleName: "ModMain",
     gradleWrapperVersion: "8.10.2",
+    keyCodePattern: "Key.{{KEY}}",
+    clientSubpackage: "client",
     gradle: { loomVersion: "1.7-SNAPSHOT" },
     vanillaGroups: { ingredients: "ItemGroups.INGREDIENTS" },
     assetFiles: [],
@@ -50,6 +52,13 @@ export function makeFixtureAdapter(): AdapterRecordT {
       itemModel: '{"parent":"item/generated","textures":{"layer0":"{{namespace}}:item/{{REG_NAME}}"}}\n',
       lootTable: '{"type":"minecraft:block","pools":[]}\n',
       mineableTag: '{"replace": false,"values": [\n    {{VALUES}}\n  ]}\n',
+      // UI templates: fake bodies, but they must consume every placeholder the engine supplies.
+      screenClass: "package {{clientPackageName}};\nclass {{SCREEN_CLASS}} {\n\tstatic final int W = {{SCREEN_WIDTH}};\n\tstatic final int H = {{SCREEN_HEIGHT}};\n\t// {{SCREEN_ID}} -> {{SCREEN_TITLE_KEY}}\n{{SCREEN_LINE_DRAWS}}\n}\n",
+      screenLineDraw: "\tdraw({{LINE_KEY}}, line {{LINE_N}});",
+      clientBootstrap: "package {{clientPackageName}};\nclass ModMainClient {\n{{KEYBIND_FIELDS}}\n\tvoid init() {\n{{KEYBIND_REGISTRATIONS}}\n\t}\n\tvoid tick() {\n{{SCREEN_OPEN_BODY}}\n\t}\n}\n",
+      keybindField: "\tstatic final Key KEY = key({{KEY_CODE}}, {{KEYBIND_LANG_KEY}}, {{KEYBIND_CATEGORY_KEY}}); // {{KEYBIND_CONST}}",
+      keybindRegister: "\t\tregister({{KEYBIND_CONST}});",
+      screenOpenStatement: "\t\topen({{KEYBIND_CONST}}, {{SCREEN_CLASS}});",
     },
     contentPaths: {
       itemModel: "src/main/resources/assets/{{namespace}}/models/item/{{id}}.json",
@@ -64,6 +73,10 @@ export function makeFixtureAdapter(): AdapterRecordT {
       item: "item.{{namespace}}.{{id}}",
       block: "block.{{namespace}}.{{id}}",
       itemGroup: "itemGroup.{{namespace}}",
+      screenTitle: "screen.{{namespace}}.{{id}}.title",
+      screenLine: "screen.{{namespace}}.{{id}}.line.{{n}}",
+      keybind: "key.{{namespace}}.{{id}}",
+      keybindCategory: "key.categories.{{namespace}}",
     },
     notes: ["fixture adapter for core tests"],
   };

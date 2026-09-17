@@ -45,6 +45,24 @@ export const ContentSpec = z.object({
   blocks: z.array(BlockSpec).default([]),
 }).strict();
 
+/** One generated in-game screen. Layout numbers are data so agents can adjust UI without editing Java. */
+export const ScreenSpec = z.object({
+  id: idField("screen"),
+  /** Window title; default derived from the id. */
+  title: z.string().min(1).optional(),
+  /** Single letter (A-Z) that opens this screen; absent = generated but not bound to a key. */
+  key: z.string().regex(/^[A-Z]$/, "key must be a single uppercase letter, e.g. K").optional(),
+  /** Translation keys appended verbatim are not allowed; use lines for text. */
+  width: z.number().int().min(80).max(1200).default(220),
+  height: z.number().int().min(60).max(1200).default(140),
+  /** Body text, one line per entry, rendered top-down. */
+  lines: z.array(z.string().min(1)).default([]),
+}).strict();
+
+export const UiSpec = z.object({
+  screens: z.array(ScreenSpec).default([]),
+}).strict();
+
 export const ModSpec = z.object({
   schemaVersion: z.literal(1),
   mod: ModMetaSpec,
@@ -53,8 +71,10 @@ export const ModSpec = z.object({
     loader: LoaderKind,
   }).strict(),
   content: ContentSpec.default({ items: [], blocks: [] }),
+  ui: UiSpec.default({ screens: [] }),
 }).strict();
 
+export type ScreenSpecT = z.infer<typeof ScreenSpec>;
 export type ItemSpecT = z.infer<typeof ItemSpec>;
 export type BlockSpecT = z.infer<typeof BlockSpec>;
 export type ModMetaT = z.infer<typeof ModMetaSpec>;

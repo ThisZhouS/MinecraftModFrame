@@ -9,7 +9,7 @@
 - `packages/core/src/envelope.ts`
 - `packages/core/src/errors.ts`
 - `packages/core/src/example.ts`
-- `packages/core/src/generators.ts` - symbols: BlockGenOut, ItemGenOut, genBlocks, genItems, makeContext
+- `packages/core/src/generators.ts` - symbols: BlockGenOut, ItemGenOut, UiGenOut, genBlocks, genItems, genUi, makeContext
 - `packages/core/src/ids.ts`
 - `packages/core/src/index.ts`
 - `packages/core/src/render.ts` - symbols: render

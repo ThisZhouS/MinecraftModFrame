@@ -1,4 +1,4 @@
-# 验收报告 / Acceptance Report — mcmodkit（首个可编译切片）
+# 验收报告 / Acceptance Report — mcmodkit（可编译切片）
 
 > 日期：2026-09-15 · 环境：Windows 11 + Node 24.11.0 + pnpm 11.6.0 + JDK 21.0.11 / JDK 17.0.20.1 · Gradle 9.5.1（Fabric 线）/ 8.8（Forge 线）
 > 证据分级：**通过 / 失败 / 阻塞 / 跳过 / 不适用**。低档通过不替代高档；外部条件缺失时记「阻塞」，不假设通过。
@@ -8,10 +8,11 @@
 | 层级 | 内容 | 结果 |
 | --- | --- | --- |
 | L1 静态 | 5 个包 `tsc`（build 内置） | ✅ 通过 |
-| L2 单元/组件 | core / adapters / cli / mcp-server / api 的 vitest 用例 | ✅ 41 passed（见 §2） |
+| L2 单元/组件 | core / adapters / cli / mcp-server / api 的 vitest 用例 | ✅ **50 passed**（见 §2） |
 | L3 集成（三面） | CLI 端到端生成、MCP stdio JSON-RPC 全链路、HTTP API 端点 | ✅ 通过（见 §3） |
-| L4 真编译 | 生成工程在目标 JDK + Gradle 下 `build` 并产出 jar | ✅ **Fabric 1.21.1**、✅ **Forge 1.20.1**；⛔ NeoForge 1.21.1（网络阻塞，见 §7.1） |
-| L5 一键复验 | `scripts/verify-build.mjs` 按适配器声明的 Gradle/JDK 线自动复跑编译 | ✅ 已交付（见 §8） |
+| L4 真编译（内容） | 物品/方块/资源/数据包生成结果在目标 JDK + Gradle 下 `build` | ✅ Fabric 1.21.1、✅ Forge 1.20.1；⛔ NeoForge（见 §8.1） |
+| L4 真编译（UI） | Screen + 按键绑定 + 客户端引导生成结果 `build` | ✅ Fabric 1.21.1（1m58s）、✅ Forge 1.20.1（30s）（见 §6） |
+| L5 一键复验 | `scripts/verify-build.mjs` 按适配器声明的 Gradle 线自动复跑编译 | ✅ 已交付（见 §9） |
 
 ## 2. L2 单元与组件测试
 
@@ -19,117 +20,127 @@
 
 | 包 | 用例数 | 覆盖的行为边界 | 结果 |
 | --- | --- | --- | --- |
-| `@mcmodkit/core` | 14 | Spec 校验与字段级报错、id 风格转换、模板渲染、生成计划（重复 id/路径守卫）、幂等落盘、外来文件不被触碰、错误码信封 | ✅ |
-| `@mcmodkit/adapters` | 11 | 适配器加载/校验/lint、资产解析、真实适配器契约、模板不得硬编码 MC 版本、**所有适配器生成结果零残留占位符** | ✅ |
+| `@mcmodkit/core` | 21 | Spec 校验与字段级报错、id 风格转换、模板渲染、生成计划（重复 id/路径守卫）、幂等落盘、外来文件不被触碰、错误码信封、**UI 计划（屏幕/引导/语言键/无键屏幕/非法键/默认值）** | ✅ |
+| `@mcmodkit/adapters` | 13 | 适配器加载/校验/lint、资产解析、真实适配器契约、模板不得硬编码 MC 版本、**所有适配器零残留占位符**、**UI 切片对每个适配器可生成**、**Screen 的版本签名分叉被钉住** | ✅ |
 | `@mcmodkit/cli` | 4 | 参数解析、stdin/文件输入、退出码映射、`--json` 信封 | ✅ |
 | `@mcmodkit/mcp-server` | 6 | 工具定义与 `callTool` 分发、错误信封 | ✅ |
 | `@mcmodkit/api` | 6 | 路由与状态码（200/400/404/500）、信封结构 | ✅ |
 
-合计 **41 passed / 0 failed**。适配器 hygiene 测试在本次迭代中**两次拦截真实缺陷**：Forge 模板注释里写死了 `1.20.1`（违反「版本事实只存于数据层」），已改为不含版本字面量的表述。
+合计 **50 passed / 0 failed**。护栏在迭代中反复拦截真实缺陷：Forge 模板注释硬编码 MC 版本、UI 契约「只实现一半」、Screen 的 `renderBackground` 版本签名写错。
 
 ## 3. L3 集成：三个智能体接入面
 
 | 面 | 用例 | 实际结果 |
 | --- | --- | --- |
 | CLI | `list-versions` | ✅ 3 个目标：fabric-1.21.1、neoforge-1.21.1、forge-1.20.1 |
-| CLI | `example -o spec.json` | ✅ UTF-8 无 BOM |
+| CLI | `example -o spec.json` | ✅ 含物品/方块/**一个带 K 键的 guide 屏幕** |
 | CLI | `validate spec.json` | ✅ `valid:true`；非法 Spec → 退出码 4 + 字段路径 |
-| CLI | `gen spec.json -o out --dry-run --json` | ✅ 返回 26 文件计划、不落盘 |
-| CLI | `gen ... --json` | ✅ 三个适配器各写入 26 个文件 |
-| CLI | `adapter forge-1.20.1 --json` | ✅ 返回构建事实（java 17 / Mojmap / wrapper 8.8 / 注记） |
+| CLI | `gen spec.json -o out --dry-run --json` | ✅ 返回 28 文件计划、不落盘 |
+| CLI | `gen ... --json` | ✅ 三个适配器各写入 28 个文件（26 内容/骨架 + 2 UI） |
+| CLI | `adapter forge-1.20.1 --json` | ✅ 构建事实（java 17 / Mojmap / wrapper 8.8 / 注记） |
 | MCP | `initialize` / `tools/list` | ✅ `mcmodkit 0.1.0`；5 个工具 |
-| MCP | `list_versions` / `get_adapter` / `validate_spec`(±) / `scaffold_mod`(dryRun) | ✅ 全部返回信封，26 文件计划 |
+| MCP | `list_versions` / `get_adapter` / `validate_spec`(±) / `scaffold_mod`(dryRun) | ✅ 全部返回信封 |
 | HTTP | `GET /health`、`/api/versions`、`/api/adapters/*` | ✅ 200 |
 | HTTP | `POST /api/validate`（±形状）、`POST /api/generate`(dryRun) | ✅ 200 / 400 + 明确提示 |
 
 ## 4. L4 真编译（一）：Fabric 1.21.1
 
+结果：**BUILD SUCCESSFUL in 29s**（内容切片）；`examplemod-1.0.0.jar`（10,917 B）+ sources jar。jar 内：`com/examplemod/{ModMain,ModMainItems,ModMainBlocks}.class`、`assets/examplemod/*`、`data/examplemod/loot_table/blocks/*.json`（**单数**）、`data/minecraft/tags/block/mineable/pickaxe.json`（**单数**）、`fabric.mod.json`、`pack.mcmeta`。
+
+## 5. L4 真编译（二）：Forge 1.20.1
+
+工具链：**Temurin JDK 17.0.20.1** + **Gradle 8.8**（ForgeGradle 6 不兼容 Gradle 9）。
+
+结果：**BUILD SUCCESSFUL in 49s**（首次 9m38s，含整套 MCP 反编译流水线）。`examplemod-1.0.0.jar`（11,955 B），经 `reobfJar`；数据包路径 `data/examplemod/loot_tables/blocks/`、`data/minecraft/tags/blocks/mineable/`（**复数**，1.20.1 约定）。
+
+**同一引擎、同一份 Spec、两个版本线，产出两种目录约定**（1.21.1 单数 vs 1.20.1 复数），两者的 jar 均由真实编译器验证 —— 「版本差异数据化」的端到端证据。
+
+## 6. L4 真编译（三）：UI 切片（本轮新增）
+
+### 6.1 生成内容
+
+Spec 里一段声明：
+
+```json
+"ui": { "screens": [ { "id": "guide", "title": "Example Mod Guide", "key": "K",
+                        "width": 240, "height": 150, "lines": ["...", "...", "..."] } ] }
 ```
-node packages/cli/dist/index.js gen Temp/e2e/spec.json -o Temp/e2e/out --json   # 26 个文件
-cd Temp/e2e/out/examplemod && gradle build --console=plain                     # Gradle 9.5.1 + JDK 21
-```
 
-结果：**BUILD SUCCESSFUL in 29s**；`examplemod-1.0.0.jar`（10,917 B）+ sources jar。jar 内：`com/examplemod/{ModMain,ModMainItems,ModMainBlocks}.class`、`assets/examplemod/{blockstates,models,lang}`、`data/examplemod/loot_table/blocks/*.json`（**单数**）、`data/minecraft/tags/block/mineable/pickaxe.json`（**单数**）、`fabric.mod.json`、`pack.mcmeta`。
+引擎产出（版本无关，装配逻辑全在 core）：`client/<Mod>GuideScreen.java`（Screen 子类：标题、面板尺寸、逐行文本、Done 按钮）+ `client/<Mod>Client.java`（按键注册 + 打开屏幕）+ 4 类语言键（标题/每行/按键名/按键分类）。
 
-## 5. L4 真编译（二）：Forge 1.20.1 —— 本轮新增，事实最强证据
+### 6.2 真编译证据
 
-工具链：**Temurin JDK 17.0.20.1**（`api.adoptium.net` 下载）+ **Gradle 8.8**（ForgeGradle 6 不兼容 Gradle 9）+ 官方 47.4.10 MDK 事实。
+| 目标 | 命令 | 结果 |
+| --- | --- | --- |
+| Fabric 1.21.1 | `verify-build.mjs --adapter fabric-1.21.1 --gradle 9=…gradle-9.5.1… --java-home-21 …` | ✅ **BUILD SUCCESSFUL in 1m58s**；jar 内含 `com/verifyfabric/client/ModMainClient.class`、`ModMainGuideScreen.class`、`fabric.mod.json`（含 `client` entrypoint） |
+| Forge 1.20.1 | `verify-build.mjs --adapter forge-1.20.1 --gradle 8=…gradle-8.8… --java-home-17 …` | ✅ **BUILD SUCCESSFUL in 30s**；jar 内含 `com/verifyforge/client/{ModMainClient,ModMainClient$ModBus,ModMainGuideScreen}.class` |
 
-```
-node packages/cli/dist/index.js gen Temp/forge/spec.json -o Temp/forge/out --json   # 26 个文件
-cd Temp/forge/out/examplemod
-$env:JAVA_HOME=<temurin-17>; gradle build --console=plain --no-daemon
-```
+### 6.3 加载器差异确实被模板吸收（同 Spec、三种引导）
 
-结果：**BUILD SUCCESSFUL in 49s**（首次构建 9m38s，含整套 MCP 反编译流水线：downloadClient/Server → mergeMappings → rename → decompile → patch → recompile → reobfJar）。
+| 加载器 | 按键注册 | 每 tick 打开屏幕 | 客户端入口 |
+| --- | --- | --- | --- |
+| Fabric | `KeyBindingHelper.registerKeyBinding` | `ClientTickEvents.END_CLIENT_TICK` | `ClientModInitializer` + `fabric.mod.json` 的 `client` entrypoint |
+| Forge 1.20.1 | `RegisterKeyMappingsEvent.register`（`Bus.MOD` 嵌套订阅类） | `TickEvent.ClientTickEvent`（FORGE 总线，`Phase.END` 判定） | `@Mod.EventBusSubscriber(value = Dist.CLIENT)`，无需元数据声明 |
+| NeoForge 1.21.1 | `RegisterKeyMappingsEvent.register`（同名事件） | `ClientTickEvent.Post` | `@EventBusSubscriber(value = Dist.CLIENT)` |
 
-| 证据 | 内容 |
-| --- | --- |
-| 产物 | `build/libs/examplemod-1.0.0.jar`（11,955 B），零编译告警 |
-| 类 | `com/examplemod/{ModMain,ModMainBlocks,ModMainItems}.class`（**经 `reobfJar` 重混淆**后） |
-| 元数据 | `META-INF/mods.toml`、`pack.mcmeta`（pack_format 15） |
-| 数据包路径 | `data/examplemod/loot_tables/blocks/*.json`、`data/minecraft/tags/blocks/mineable/pickaxe.json`（**复数**，1.20.1 约定） |
-| 资源 | `assets/examplemod/{blockstates,models/block,models/item,lang}` |
-
-**同一引擎、同一份 Spec、两个版本线，产出两种目录约定**（1.21.1 单数 vs 1.20.1 复数），两者的 jar 均已由真实编译器验证 —— 这正是「版本差异数据化」这条核心原则的端到端证据。
-
-### 5.1 本轮由真实编译发现并修复的缺陷
+### 6.4 本轮由真编译发现并修复的缺陷
 
 | # | 现象 | 根因 | 修复 | 复测 |
 | --- | --- | --- | --- | --- |
-| 1 | `找不到符号 ItemLike`（循环变量与 TAB_ENTRIES 声明） | Forge 模板 import 写成 `net.minecraft.world.item.ItemLike`；实测该包在 **1.20.1 与 1.21.1 均不存在** | 改为 `net.minecraft.world.level.ItemLike`（与 Fabric/NeoForge 适配器一致），并把「`javap` 双版本取证」写入注记 | ✅ BUILD SUCCESSFUL，0 错误 |
-| 2 | 分组物品引用了未导入的 `CreativeModeTabs` | `itemRegistrationGroup` 模板产出 `CreativeModeTabs.*`，注册类模板缺该 import | 补 import（未使用只是告警，不影响编译） | ✅ |
-| 3 | `ResourceLocation(String,String)` 弃用告警 | 1.20.1 Mojmap 标记该构造器为 `forRemoval` | 改用 `ResourceLocation.fromNamespaceAndPath(...)`（`javap` 确认 1.20.1 存在），告警归零 | ✅ 无告警 |
+| 1 | Forge 编译：`找不到符号 变量 ModMain` | 客户端类位于 `…​.client` 子包，引用父包的主类常量 `MOD_ID` 却没有 `import`（Java 不隐式导入父包） | 在 Forge/NeoForge 的客户端引导模板中加入 `import {{packageName}}.{{mainClassSimpleName}};` | ✅ Forge BUILD SUCCESSFUL in 30s |
+| 2 | （预防性）`Screen#renderBackground` 两版签名不同 | 1.20.1 收 `(GuiGraphics)`，1.21.x 收 `(GuiGraphics,int,int,float)`；均由 `javap` 对真实映射 jar 取证 | 分叉进各自适配器的 `screenClass` 模板，并有测试钉住两侧写法 | ✅ Fabric/Forge 均编译通过 |
 
-取证方法：对**真实映射后的 jar** 跑 `javap`，而不是凭记忆下结论 —— 本轮的 `ItemLike` 结论最初也被我自己误判为「1.20.5 迁移」，是 `javap` 纠正了它。
+取证方法延续上一轮：先 `javap` 真实映射 jar 得到签名，再写模板，最后用真实编译器确认 —— 静态检查与编译验证各司其职。
 
-## 6. 本轮交付的其他能力
+## 7. 本轮交付的其他能力
 
-- `scripts/verify-build.mjs`：一键复验（见 §8）。
-- `packages/adapters/assets/gradle-8.8/`：Forge 线的独立 wrapper 资产（含 PROVENANCE）。
-- 新增 hygiene 守卫：所有适配器生成结果**零残留占位符**（对尚不能编译验证的适配器是关键防线）。
+- Spec 新增 `ui.screens[]`（id/title/key/width/height/lines），缺省值可省略；非法键给出字段级报错。
+- 适配器契约新增 `keyCodePattern`（键码表达式，默认 `org.lwjgl.glfw.GLFW.GLFW_KEY_{{KEY}}`）与 `clientSubpackage`；UI 模板「可选但全有或全无」，由 lint 强制。
+- `scripts/verify-build.mjs`：一键复验，按适配器声明的 wrapper 版本选 Gradle 线。
+- Gradle 9.5.1 经腾讯云镜像重新取得（`services.gradle.org` 会跳转到被阻断的 github.com），Fabric 线复验能力恢复。
 
-## 7. 阻塞 / 跳过 / 不适用
+## 8. 阻塞 / 跳过 / 不适用
 
-### 7.1 NeoForge 1.21.1 真编译 —— ⛔ 阻塞（环境）
+### 8.1 NeoForge 1.21.1 真编译 —— ⛔ 阻塞（环境）
 
 | 尝试 | 配置 | 结果 | 说明 |
 | --- | --- | --- | --- |
-| 1 | 官方 maven 在前 | ❌ 插件未找到 | Gradle 访问 `maven.neoforged.net` 得到 SSL reset 后**硬失败**，不回落 |
-| 2 | 镜像在前、官方在后 | ❌ 传递依赖失败 | 插件从镜像解析成功；MDG 的 `gradle-idea-ext` 回落官方 maven → 硬失败 |
-| 3 | 官方 maven 置于最后 | ❌ `neoFormRuntimeExternalTools` 失败 | `neoform-runtime` 只能从 MDG 自注册仓库（官方）取得 |
-| 4 | `PREFER_SETTINGS` 强制设置级仓库 | ❌ `minecraft-dependencies` 缺失 | 插件与 neoform-runtime 均从镜像解析成功；但 `net.neoforged:minecraft-dependencies:1.21.1` 在镜像 **404**（curl 实测），仅有官方 maven 提供 |
+| 1 | 官方 maven 在前 | ❌ 插件未找到 | Gradle 访问 `maven.neoforged.net` 得到 SSL reset 后硬失败，不回落 |
+| 2 | 镜像在前、官方在后 | ❌ 传递依赖失败 | 插件从镜像解析成功；`gradle-idea-ext` 回落官方 maven → 硬失败 |
+| 3 | 官方 maven 置于最后 | ❌ `neoform-runtime` 失败 | 该工件只能从 MDG 自注册仓库（官方）取得 |
+| 4 | `PREFER_SETTINGS` 强制设置级仓库 | ❌ `minecraft-dependencies` 缺失 | `net.neoforged:minecraft-dependencies:1.21.1` 在镜像 **404**，仅有官方 maven 提供 |
 
-**离线静态校验（本轮新增，作为阻塞下的最大努力）**：对 NeoForge 适配器模板引用的 13 个 `net.minecraft.*` 类逐个 `javap` 校验（1.21.1 Mojmap 真实 jar）→ **13/13 存在**；但 8 个 `net.neoforged.*` 类**无法离线校验**：其类文件位于 `neoforge-*-universal.jar` 与 FML 工件，均托管在被阻断的 maven 上（本地 userdev jar 只含 `config.json` / `patches/` / `joined.lzma`，而 joined 包内是补丁后的原版 MC，不含 NeoForge 代码）。因此 NeoForge 侧 API 仍必须在可达网络上编译验证 —— 对照经验：Forge 线同样的模板结构被编译器抓出两处 API 错误（§5 表首行），静态检查无法替代编译。
+**离线静态校验（最大努力）**：NeoForge 适配器模板引用的 13 个 `net.minecraft.*` 类逐个 `javap`（1.21.1 真实映射 jar）→ **13/13 存在**；8 个 `net.neoforged.*` 类**无法离线校验**（类文件在 `neoforge-*-universal.jar` 与 FML 工件内，两者都托管在被阻断的 maven 上；本地 userdev jar 只有 config/patches/joined.lzma，joined 内是补丁后的原版 MC，不含 NeoForge 代码）。
 
-结论：**本机无法完成 NeoForge 编译验证**。已确认有效：适配器加载、lint、26 文件生成、零残留占位符、插件 id 与版本号取自官方元数据（ModDevGradle 2.0.147 / NeoForge 21.1.250）。**未验证**：NeoForge Java 模板的 API 正确性（对照：Forge 线同样的模板结构刚被编译器抓出两处 API 错误，说明这类验证不可省略）。因此 `neoforge-1.21.1` 一律标注「已生成，未编译验证」。
+结论：**本机无法完成 NeoForge 编译验证**。`neoforge-1.21.1` 一律标注「已生成，未编译验证」。对照经验：Forge 线同样的模板结构被编译器抓出 3 处 API 错误（§5、§6.4），静态检查无法替代编译。
 
-### 7.2 其他阻塞 / 跳过
+### 8.2 其他阻塞 / 跳过
 
 | 项 | 状态 | 原因与影响 |
 | --- | --- | --- |
-| `gradlew` 自动下载 Gradle 发行版 | ⛔ 阻塞（环境） | 本机 Java 对发行版 CDN 连接超时；且重下 Gradle 9.5.1 时 `curl` 连 `github.com` 失败（`services.gradle.org` 重定向目标）。**不影响产物正确性**：验收使用本地已解压的 Gradle 8.8 / 9.5.1 发行版；wrapper 四件套随工程分发 |
-| Fabric 线经 `verify-build.mjs` 复跑 | ⏭ 跳过 | 复验脚本已于本轮对 **Forge 线**端到端跑通；Fabric 线需 Gradle 9 发行版（本机副本已在清理 Temp 时删除，重下受 §7.2 第一条阻塞）。Fabric 的编译结论来自 §4 的直接验证 |
-| 浏览器端验证 | ⏭ 跳过 | 本会话无可用浏览器 provider，且本期无 UI |
+| `gradlew` 自动下载 Gradle 发行版 | ⛔ 阻塞（环境） | 本机 Java 对发行版 CDN 连接超时；`services.gradle.org` 部分重定向到被阻断的 github.com。**不影响产物**：验收使用本地发行版，wrapper 四件套随工程分发 |
+| 浏览器端验证 | ⏭ 跳过 | 本会话无可用浏览器 provider；生成物是游戏内 UI，本就无法在浏览器里验证 |
+| **游戏内运行时验证**（真的按 K 打开屏幕） | ⏭ 跳过 | 需要可运行的 Minecraft 客户端与图形环境；本框架的验收止于「编译通过 + 类与资源进入 jar」 |
 | MC 26.x（Java 25）目标 | ⏭ 跳过 | 无 JDK 25；未纳入本期适配器 |
 | Linux/macOS 生成与构建 | ⏭ 跳过 | 本机为 Windows；已用 posix 相对路径 + `executable` 位降低风险，未实测 |
 
-## 8. 一键复验 / Re-verification
+## 9. 一键复验 / Re-verification
 
 ```bash
-pnpm -r build && pnpm -r test            # 41 passed
+pnpm -r build && pnpm -r test            # 50 passed
+node scripts/verify-build.mjs --adapter fabric-1.21.1 \
+  --gradle "9=C:/tools/gradle-9.5.1/bin/gradle.bat" --java-home-21 <jdk21>
 node scripts/verify-build.mjs --adapter forge-1.20.1 \
-  --gradle "8=C:/tools/gradle-8.8/bin/gradle.bat" \
-  --java-home-17 C:/tools/jdk17
+  --gradle "8=C:/tools/gradle-8.8/bin/gradle.bat" --java-home-17 <jdk17>
 ```
 
-脚本按**适配器声明的 `gradleWrapperVersion`** 选择 Gradle 线（Loom 需 Gradle 9、ForgeGradle 6 拒绝 Gradle 9），缺工具链时如实报 `SKIPPED` 而不是假装通过；任一目标失败则退出码 1，并在 `Temp/verify-build/<adapter>/build.log` 留下完整日志。
+脚本按**适配器声明的 `gradleWrapperVersion`** 选择 Gradle 线，缺工具链时如实报 `SKIPPED`；失败退出码 1，并在 `Temp/verify-build/<adapter>/build.log` 留完整日志。
 
-## 9. 遗留风险与缺口
+## 10. 遗留风险与缺口
 
-1. **版本漂移**：适配器钉住的版本号（Fabric loader 0.19.5 / API 0.116.17+1.21.1 / Loom 1.17-SNAPSHOT / NeoForge 21.1.250 / MDG 2.0.147 / Forge 47.4.10 / ForgeGradle 6.0.54）会随上游更新而变旧，需要版本巡检工作流（数据源见 docs/research/2026-09-version-api-knowledge.md §2.4）。
-2. **NeoForge 未编译验证**：见 §7.1；在能访问 `maven.neoforged.net` 的机器上跑一次 `verify-build.mjs --adapter neoforge-1.21.1` 即可补齐。
-3. **贴图缺失**：生成工程可编译、可加载，但物品/方块贴图需自备（生成工程 README 已明确）。
-4. **覆盖子集有限**：配方、进度、实体、附魔、UI(Screen)、datagen 生成器尚未实现 —— 这是下一步的主要工作。
-5. **未做负面安全测试**：路径逃逸有实现级守卫与单测，但未做模糊测试；MCP/HTTP 面未做鉴权（默认仅监听 loopback）。
-6. **`Temp/` 下的验收产物**（Gradle 8.8 / JDK 17 / 生成的工程）属临时物，不入库；结论已誊录本报告。
+1. **NeoForge 未编译验证**：见 §8.1；在能访问 `maven.neoforged.net` 的机器上跑 `verify-build.mjs --adapter neoforge-1.21.1` 即可补齐。
+2. **UI 只到「可编译」**：没有运行时验证（无法在无图形环境启动客户端），也没有贴图/字体/交互逻辑（输入框、列表、滚动）。
+3. **版本漂移**：适配器钉住的版本号会随上游变旧，需要版本巡检工作流（数据源见 docs/research/2026-09-version-api-knowledge.md §2.4）。
+4. **贴图缺失**：物品/方块贴图需自备（生成工程 README 已明确）。
+5. **覆盖子集仍有限**：配方、进度、实体、附魔、datagen 尚未实现。
+6. **未做负面安全测试**：路径逃逸有实现级守卫与单测，但无模糊测试；MCP/HTTP 面未做鉴权（默认仅监听 loopback）。

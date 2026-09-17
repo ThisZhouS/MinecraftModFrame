@@ -25,6 +25,14 @@
 - `packages/api`：`node:http` JSON API（`/api/versions`、`/api/validate`、`/api/generate` 等）。
 - 测试分布：core 14、adapters 10、cli 4、mcp-server 6、api 6。
 
+## S7 交付物（UI 切片，已完成）
+
+- Spec 新增 `ui.screens[]`：id / title / key(A-Z) / width / height / lines。
+- 引擎 `genUi`：每个 screen 一个 `client/<Mod><Id>Screen.java`；有声明的键时额外产出 `client/<Mod>Client.java`（注册键 + 打开屏幕），并生成 4 类语言键。
+- 三个适配器各新增 6 个 UI 模板（screenClass / screenLineDraw / clientBootstrap / keybindField / keybindRegister / screenOpenStatement）+ 4 个 langKeys；Fabric 额外把 `client` entrypoint 接入 `fabric.mod.json`。
+- 契约新增：`keyCodePattern`（键码表达式，默认 GLFW）、`clientSubpackage`；lint 强制「UI 模板全有或全无」且必须配齐语言键。
+- 验收：Fabric 1.21.1 与 Forge 1.20.1 生成工程**真编译通过**（见 acceptance-report §6）。
+
 ## S4 交付物（Fabric 1.21.1，已完成）
 
 - `packages/adapters/data/fabric-1.21.1.json`：完整适配器（构建事实、文件计划、模板、陷阱注记）。
@@ -47,6 +55,7 @@
 
 | 风险 | 影响 | 缓解 |
 | --- | --- | --- |
+| UI 模板只实现一半（三个加载器各有自己的客户端引导方式） | 产出无法编译的 Java | 契约把 UI 模板定为「全有或全无」，lint 直接拦截；Screen 本体按 `javap` 取证的两版签名分叉 |
 | 版本 API 漂移（1.21.x 持续破坏性变更） | 模板过期 | 适配器数据 + 编译级验收；每个适配器带 `notes` 陷阱注记 |
 | 本机仅预装 JDK 21 | 1.20.1（Java 17）原本无法本机编译 | 实测可通过 `api.adoptium.net` 取得 Temurin JDK 17 ⇒ **1.20.1 已编译验证**；26.x（Java 25）仍为「仅生成、受限验证」 |
 | 首次构建需联网（Gradle/Loom/Minecraft） | 离线环境无法构建 | 生成阶段零网络；README 明示首次构建需联网；wrapper 随工程分发 |

@@ -26,5 +26,21 @@ export function exampleSpec(): ModSpecT {
         { id: "deepslate_ruby_ore", hardness: 4.5, resistance: 12.0, tool: "pickaxe" },
       ],
     },
+    ui: {
+      screens: [
+        {
+          id: "guide",
+          title: "Example Mod Guide",
+          key: "K",
+          width: 240,
+          height: 150,
+          lines: [
+            "Press K to open this screen.",
+            "Items, blocks and this UI are all generated from one JSON spec.",
+            "Change the spec, run gen again, and this file is rewritten.",
+          ],
+        },
+      ],
+    },
   };
 }

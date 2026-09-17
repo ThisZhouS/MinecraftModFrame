@@ -46,7 +46,7 @@ MCP 工具**不执行任何 shell/构建命令**：构建由使用方自行决�
 | 适配器 | MC | 加载器 | Java | 状态 |
 | --- | --- | --- | --- | --- |
 | `fabric-1.21.1` | 1.21.1 | Fabric (loader 0.19.5) | 21 | ✅ **真编译通过**（产出 jar） |
-| `neoforge-1.21.1` | 1.21.1 | NeoForge (21.1.250, ModDevGradle 2.0.147) | 21 | ⚠️ 已生成，**未编译验证**（本机网络无法访问 maven.neoforged.net；证据见验收报告 §6.1） |
+| `neoforge-1.21.1` | 1.21.1 | NeoForge (21.1.250, ModDevGradle 2.0.147) | 21 | ⚠️ 已生成，**未编译验证**（本机网络无法访问 maven.neoforged.net；证据见验收报告 §8.1） |
 | `forge-1.20.1` | 1.20.1 | Forge (47.4.10, ForgeGradle 6.0.54, Gradle 8.8) | 17 | ✅ **真编译通过**（产出经 reobfJar 的 jar） |
 
 新增一个目标 = 新增 `packages/adapters/data/<loader>-<mcVersion>.json`（可用 `mcmod adapter <id> --templates` 参考现有适配器），无需改动引擎。
@@ -60,6 +60,7 @@ out/my-mod/
 ├── README.md                                     # 构建/贴图/迭代说明
 └── src/main/
     ├── java/com/examplemod/ModMain*.java         # 主类 + 物品/方块注册类
+    ├── java/com/examplemod/client/…              # UI：<Mod><Id>Screen + 按键/客户端引导（声明 ui.screens 时）
     └── resources/
         ├── fabric.mod.json | META-INF/neoforge.mods.toml, pack.mcmeta
         ├── assets/<ns>/{lang,models,blockstates}
@@ -67,6 +68,24 @@ out/my-mod/
 ```
 
 贴图（16×16 PNG）不生成，生成工程的 README 会明确列出需要自备的文件。
+
+## UI 生成：一份 Spec 描述游戏内界面
+
+```jsonc
+"ui": {
+  "screens": [
+    {
+      "id": "guide",
+      "title": "Example Mod Guide",   // 缺省时由 id 推导
+      "key": "K",                     // 单个大写字母；省略则只生成类、不绑定按键
+      "width": 240, "height": 150,    // 面板尺寸（参数化，改 Spec 即改 UI）
+      "lines": ["第一行", "第二行"]     // 逐行文本，自动生成语言键
+    }
+  ]
+}
+```
+
+产出：`client/<Mod>GuideScreen.java`（Screen 子类 + Done 按钮）、`client/<Mod>Client.java`（按键注册与打开逻辑）、以及标题/每行/按键名/按键分类 4 类语言键。三个加载器各自用**自己的**事件与入口（Fabric 的 `ClientModInitializer` + `fabric.mod.json` client entrypoint；Forge/NeoForge 的 `@Mod.EventBusSubscriber`/`@EventBusSubscriber` + `RegisterKeyMappingsEvent`），引擎只做装配。
 
 ## 接给智能体 / Wiring an agent
 

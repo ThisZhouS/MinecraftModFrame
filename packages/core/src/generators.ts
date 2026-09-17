@@ -46,6 +46,10 @@ export function buildVars(spec: ModSpecT, adapter: AdapterRecordT): Record<strin
     gradleVars[`gradle_${k}`] = v == null ? "" : typeof v === "string" ? v : JSON.stringify(v);
   }
   const packageName = renderTemplate(adapter.basePackagePattern, { modId, namespace: ns }, "basePackagePattern");
+  const clientPackageName = `${packageName}.${adapter.clientSubpackage}`;
+  // A client bootstrap only exists when at least one screen is bound to a key (otherwise nothing to register).
+  const hasKeybinds = spec.ui.screens.some((s) => s.key !== undefined);
+  const clientEntrypoint = hasKeybinds ? `${clientPackageName}.${adapter.mainClassSimpleName}Client` : "";
   return {
     modId,
     namespace: ns,
@@ -64,6 +68,11 @@ export function buildVars(spec: ModSpecT, adapter: AdapterRecordT): Record<strin
     gradleWrapperVersion: adapter.gradleWrapperVersion,
     packageName,
     packagePath: packageName.split(".").join("/"),
+    clientPackageName,
+    clientPackagePath: clientPackageName.split(".").join("/"),
+    clientEntrypoint,
+    /** Quoted form for JSON templates; empty string keeps the JSON array valid. */
+    clientEntrypointJson: clientEntrypoint === "" ? "" : JSON.stringify(clientEntrypoint),
     mainClassSimpleName: adapter.mainClassSimpleName,
     mainClassFq: `${packageName}.${adapter.mainClassSimpleName}`,
     ...gradleVars,
@@ -177,6 +186,100 @@ function genBlocks(ctx: GenContext): BlockGenOut {
   return out;
 }
 
+interface UiGenOut {
+  files: FileEntry[];
+  langEntries: Record<string, string>;
+}
+
+/**
+ * UI generator: turns spec.ui.screens into a client Screen class per screen plus one client
+ * bootstrap that binds keys and opens the screens. Every loader/version detail (imports, event
+ * classes, key input API, renderBackground signature) comes from adapter templates, so the engine
+ * stays free of version branches (Principle 1).
+ */
+function genUi(ctx: GenContext, javaDir: string): UiGenOut {
+  const out: UiGenOut = { files: [], langEntries: {} };
+  const screens = ctx.spec.ui.screens;
+  if (screens.length === 0) return out;
+  const a = ctx.adapter;
+  if (a.templates.screenClass === undefined || a.langKeys.screenTitle === undefined) {
+    throw new McmodError(
+      "ADAPTER_INVALID",
+      `Adapter ${a.id} does not support ui.screens: it declares no screen templates. Use list-versions to find an adapter that does.`,
+      { adapterId: a.id },
+    );
+  }
+  const fieldLines: string[] = [];
+  const registerLines: string[] = [];
+  const openLines: string[] = [];
+  for (const screen of screens) {
+    const className = `${a.mainClassSimpleName}${toPascalCase(screen.id)}Screen`;
+    const display = screen.title ?? toDisplayName(screen.id);
+    const titleKey = renderTemplate(a.langKeys.screenTitle, { namespace: ctx.vars.namespace!, id: screen.id }, "langKeys.screenTitle");
+    out.langEntries[titleKey] = display;
+    const lineDraws = screen.lines
+      .map((text, i) => {
+        const lineKey = renderTemplate(
+          a.langKeys.screenLine!,
+          { namespace: ctx.vars.namespace!, id: screen.id, n: String(i + 1) },
+          "langKeys.screenLine",
+        );
+        out.langEntries[lineKey] = text;
+        return renderTemplate(a.templates.screenLineDraw!, { ...ctx.vars, LINE_KEY: lineKey, LINE_N: String(i + 1) }, "screenLineDraw");
+      })
+      .join("\n");
+    out.files.push({
+      path: `${javaDir}${a.clientSubpackage}/${className}.java`,
+      content: renderTemplate(
+        a.templates.screenClass,
+        {
+          ...ctx.vars,
+          SCREEN_CLASS: className,
+          SCREEN_ID: screen.id,
+          SCREEN_TITLE_KEY: titleKey,
+          SCREEN_WIDTH: String(screen.width),
+          SCREEN_HEIGHT: String(screen.height),
+          SCREEN_LINE_DRAWS: lineDraws,
+        },
+        "screenClass",
+      ),
+      managed: true,
+      executable: false,
+      reason: `ui:${screen.id}:screen`,
+    });
+    if (screen.key === undefined) continue;
+    const constName = `KEY_${screen.id.toUpperCase()}`;
+    const keybindKey = renderTemplate(a.langKeys.keybind!, { namespace: ctx.vars.namespace!, id: screen.id }, "langKeys.keybind");
+    const categoryKey = renderTemplate(a.langKeys.keybindCategory!, { namespace: ctx.vars.namespace! }, "langKeys.keybindCategory");
+    const keyCode = renderTemplate(a.keyCodePattern, { KEY: screen.key }, "keyCodePattern");
+    out.langEntries[keybindKey] = `Open ${display}`;
+    out.langEntries[categoryKey] = ctx.vars.modName!;
+    const bindVars = { ...ctx.vars, KEYBIND_CONST: constName, KEY_CODE: keyCode, KEYBIND_LANG_KEY: keybindKey, KEYBIND_CATEGORY_KEY: categoryKey };
+    fieldLines.push(renderTemplate(a.templates.keybindField!, bindVars, "keybindField"));
+    registerLines.push(renderTemplate(a.templates.keybindRegister!, bindVars, "keybindRegister"));
+    openLines.push(renderTemplate(a.templates.screenOpenStatement!, { ...bindVars, SCREEN_CLASS: className }, "screenOpenStatement"));
+  }
+  if (openLines.length > 0) {
+    out.files.push({
+      path: `${javaDir}${a.clientSubpackage}/${a.mainClassSimpleName}Client.java`,
+      content: renderTemplate(
+        a.templates.clientBootstrap!,
+        {
+          ...ctx.vars,
+          KEYBIND_FIELDS: fieldLines.join("\n"),
+          KEYBIND_REGISTRATIONS: registerLines.join("\n"),
+          SCREEN_OPEN_BODY: openLines.join("\n"),
+        },
+        "clientBootstrap",
+      ),
+      managed: true,
+      executable: false,
+      reason: "ui:client-bootstrap",
+    });
+  }
+  return out;
+}
+
 export interface PlanOptions {
   /**
    * Resolve an adapter asset key to an absolute file path. Required when the adapter declares
@@ -258,10 +361,14 @@ export function planGeneration(spec: ModSpecT, adapter: AdapterRecordT, options:
     managed: true, executable: false, reason: "blocks-registry",
   });
 
+  const ui = genUi(ctx, javaDir);
+  files.push(...ui.files);
+
   const langObj: Record<string, string> = {
     [renderTemplate(adapter.langKeys.itemGroup, { namespace: ctx.vars.namespace! }, "langKeys.itemGroup")]: ctx.vars.modName!,
     ...items.langEntries,
     ...blocks.langEntries,
+    ...ui.langEntries,
   };
   files.push({
     path: renderPath(adapter.contentPaths.lang, ctx.vars, "contentPaths.lang"),
