@@ -108,6 +108,23 @@ out/my-mod/
 - 进度自动生成判据（`minecraft:recipe_unlocked` + `minecraft:inventory_changed`）、`rewards.recipes`（配方书解锁）与语言键。
 - **版本方言自动适配**：1.21 把物品栈的键从 `item` 改成 `id`、把物品谓词拍平成字符串、烹饪/切石 result 换成对象形态，数据包目录也从 `recipes/` 变 `recipe/`（`advancements/` → `advancement/`）——这些差异全部写在适配器数据里，引擎零版本分支。方言以 **jar 内原版数据**为准（编译不校验 JSON 语义）。
 
+## 实体生成
+
+```jsonc
+"entities": [
+  { "id": "ruby_golem", "name": "Ruby Golem", "kind": "monster",
+    "health": 30, "speed": 0.28, "attackDamage": 5, "followRange": 24,
+    "width": 0.9, "height": 1.6, "shadow": 0.7,
+    "model": "cow",                                   // 复用原版模型：pig/cow/chicken/sheep
+    "loot": [ { "item": "ruby", "min": 1, "max": 2 },
+              { "item": "charged_ruby", "chance": 0.25 } ] }
+]
+```
+
+产出：`entity/<Mod>RubyGolemEntity.java`（属性与体积）、`client/<Mod>RubyGolemRenderer.java`、`<Mod>Entities.java`（实体类型 + 属性注册）、`data/<ns>/loot_table(s)/entities/ruby_golem.json`，并把注册调用注入主类、把渲染器注册注入客户端引导。三个加载器各用自己的机制（Fabric 的 `Registry.register` + `FabricDefaultAttributeRegistry` + `EntityRendererRegistry`；Forge/NeoForge 的 `DeferredRegister` + `EntityAttributeCreationEvent` + `EntityRenderersEvent`）。
+
+**未生成**：AI 目标（`registerGoals`）、生成蛋、贴图与自定义模型（渲染器默认复用原版模型，贴图需自备 `assets/<ns>/textures/entity/<id>.png`）。
+
 ## 接给智能体 / Wiring an agent
 
 ### MCP（stdio，推荐）

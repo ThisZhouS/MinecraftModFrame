@@ -140,10 +140,53 @@ export const AdvancementSpec = z
     }
   });
 
+/** One generated mob. Attributes, size and loot are data so an agent can tune behaviour from the spec. */
+export const EntitySpec = z
+  .object({
+    id: idField("entity"),
+    name: z.string().min(1).optional(),
+    /** monster = hostile Monster subclass, creature = neutral PathfinderMob. */
+    kind: z.enum(["monster", "creature"]).default("monster"),
+    /** Mob category used by EntityType.Builder (spawn rules/limits). */
+    category: z.enum(["monster", "creature", "ambient", "axolotls", "underground_water_creature", "water_creature", "water_ambient", "misc"]).optional(),
+    health: z.number().min(1).max(1024).default(20),
+    speed: z.number().min(0).max(5).default(0.25),
+    attackDamage: z.number().min(0).max(2048).default(3),
+    followRange: z.number().min(1).max(128).default(16),
+    /** Bounding box in blocks. */
+    width: z.number().min(0.1).max(10).default(0.9),
+    height: z.number().min(0.1).max(10).default(1.4),
+    /** Client shadow radius. */
+    shadow: z.number().min(0).max(4).default(0.5),
+    /** Vanilla model the generated renderer reuses (adapter entityModels key), e.g. pig/humanoid/cow. */
+    model: z.string().regex(ENTRY_ID_RE).default("pig"),
+    /** Drop table; empty = no drops. */
+    loot: z
+      .array(
+        z
+          .object({
+            item: ItemRefSpec,
+            min: z.number().int().min(0).max(64).default(1),
+            max: z.number().int().min(0).max(64).default(1),
+            chance: z.number().min(0).max(1).default(1),
+          })
+          .strict(),
+      )
+      .default([]),
+  })
+  .strict()
+  .superRefine((e, ctx) => {
+    e.loot.forEach((drop, i) => {
+      if (drop.max < drop.min) {
+        ctx.addIssue({ code: "custom", path: ["loot", i, "max"], message: "max must be >= min" });
+      }
+    });
+  });
 export const ContentSpec = z.object({
   items: z.array(ItemSpec).default([]),
   blocks: z.array(BlockSpec).default([]),
   recipes: z.array(RecipeSpec).default([]),
+  entities: z.array(EntitySpec).default([]),
   advancements: z.array(AdvancementSpec).default([]),
 }).strict();
 
@@ -172,7 +215,7 @@ export const ModSpec = z.object({
     mcVersion: z.string().regex(MC_VERSION_RE, "mcVersion must look like 1.21.1"),
     loader: LoaderKind,
   }).strict(),
-  content: ContentSpec.default({ items: [], blocks: [], recipes: [], advancements: [] }),
+  content: ContentSpec.default({ items: [], blocks: [], recipes: [], advancements: [], entities: [] }),
   ui: UiSpec.default({ screens: [] }),
 }).strict();
 

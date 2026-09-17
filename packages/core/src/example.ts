@@ -56,6 +56,25 @@ export function exampleSpec(): ModSpecT {
           unlockRecipes: ["charged_ruby"],
         },
       ],
+      entities: [
+        {
+          id: "ruby_golem",
+          name: "Ruby Golem",
+          kind: "monster",
+          health: 30,
+          speed: 0.28,
+          attackDamage: 5,
+          followRange: 24,
+          width: 0.9,
+          height: 1.6,
+          shadow: 0.7,
+          model: "cow",
+          loot: [
+            { item: "ruby", min: 1, max: 2 },
+            { item: "charged_ruby", chance: 0.25 },
+          ],
+        },
+      ],
     },
     ui: {
       screens: [

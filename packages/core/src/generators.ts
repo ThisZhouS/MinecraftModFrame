@@ -47,8 +47,10 @@ export function buildVars(spec: ModSpecT, adapter: AdapterRecordT): Record<strin
   }
   const packageName = renderTemplate(adapter.basePackagePattern, { modId, namespace: ns }, "basePackagePattern");
   const clientPackageName = `${packageName}.${adapter.clientSubpackage}`;
-  // A client bootstrap only exists when at least one screen is bound to a key (otherwise nothing to register).
-  const hasKeybinds = spec.ui.screens.some((s) => s.key !== undefined);
+  const entityPackageName = `${packageName}.${adapter.entitySubpackage}`;
+  // A client bootstrap is needed for key-bound screens and for entity renderers alike.
+  const hasKeybinds =
+    spec.ui.screens.some((s) => s.key !== undefined) || spec.content.entities.length > 0;
   const clientEntrypoint = hasKeybinds ? `${clientPackageName}.${adapter.mainClassSimpleName}Client` : "";
   return {
     modId,
@@ -70,6 +72,8 @@ export function buildVars(spec: ModSpecT, adapter: AdapterRecordT): Record<strin
     packagePath: packageName.split(".").join("/"),
     clientPackageName,
     clientPackagePath: clientPackageName.split(".").join("/"),
+    entityPackageName,
+    entityPackagePath: entityPackageName.split(".").join("/"),
     clientEntrypoint,
     /** Quoted form for JSON templates; empty string keeps the JSON array valid. */
     clientEntrypointJson: clientEntrypoint === "" ? "" : JSON.stringify(clientEntrypoint),
@@ -197,12 +201,12 @@ interface UiGenOut {
  * classes, key input API, renderBackground signature) comes from adapter templates, so the engine
  * stays free of version branches (Principle 1).
  */
-function genUi(ctx: GenContext, javaDir: string): UiGenOut {
+function genUi(ctx: GenContext, javaDir: string, rendererRegistrations: string[] = []): UiGenOut {
   const out: UiGenOut = { files: [], langEntries: {} };
   const screens = ctx.spec.ui.screens;
-  if (screens.length === 0) return out;
+  if (screens.length === 0 && rendererRegistrations.length === 0) return out;
   const a = ctx.adapter;
-  if (a.templates.screenClass === undefined || a.langKeys.screenTitle === undefined) {
+  if (screens.length > 0 && (a.templates.screenClass === undefined || a.langKeys.screenTitle === undefined)) {
     throw new McmodError(
       "ADAPTER_INVALID",
       `Adapter ${a.id} does not support ui.screens: it declares no screen templates. Use list-versions to find an adapter that does.`,
@@ -215,7 +219,7 @@ function genUi(ctx: GenContext, javaDir: string): UiGenOut {
   for (const screen of screens) {
     const className = `${a.mainClassSimpleName}${toPascalCase(screen.id)}Screen`;
     const display = screen.title ?? toDisplayName(screen.id);
-    const titleKey = renderTemplate(a.langKeys.screenTitle, { namespace: ctx.vars.namespace!, id: screen.id }, "langKeys.screenTitle");
+    const titleKey = renderTemplate(a.langKeys.screenTitle!, { namespace: ctx.vars.namespace!, id: screen.id }, "langKeys.screenTitle");
     out.langEntries[titleKey] = display;
     const lineDraws = screen.lines
       .map((text, i) => {
@@ -231,7 +235,7 @@ function genUi(ctx: GenContext, javaDir: string): UiGenOut {
     out.files.push({
       path: `${javaDir}${a.clientSubpackage}/${className}.java`,
       content: renderTemplate(
-        a.templates.screenClass,
+        a.templates.screenClass!,
         {
           ...ctx.vars,
           SCREEN_CLASS: className,
@@ -259,7 +263,7 @@ function genUi(ctx: GenContext, javaDir: string): UiGenOut {
     registerLines.push(renderTemplate(a.templates.keybindRegister!, bindVars, "keybindRegister"));
     openLines.push(renderTemplate(a.templates.screenOpenStatement!, { ...bindVars, SCREEN_CLASS: className }, "screenOpenStatement"));
   }
-  if (openLines.length > 0) {
+  if (openLines.length > 0 || rendererRegistrations.length > 0) {
     out.files.push({
       path: `${javaDir}${a.clientSubpackage}/${a.mainClassSimpleName}Client.java`,
       content: renderTemplate(
@@ -269,6 +273,7 @@ function genUi(ctx: GenContext, javaDir: string): UiGenOut {
           KEYBIND_FIELDS: fieldLines.join("\n"),
           KEYBIND_REGISTRATIONS: registerLines.join("\n"),
           SCREEN_OPEN_BODY: openLines.join("\n"),
+          ENTITY_RENDERER_REGISTRATIONS: rendererRegistrations.join("\n"),
         },
         "clientBootstrap",
       ),
@@ -510,6 +515,134 @@ function genAdvancements(ctx: GenContext, recipeResults: Map<string, string>): A
   return out;
 }
 
+interface EntityGenOut {
+  files: FileEntry[];
+  entityRegistrations: string[];
+  attributeHooks: string[];
+  rendererRegistrations: string[];
+  registryInitCalls: string[];
+  langEntries: Record<string, string>;
+}
+
+/** Entity loot table JSON. The format is shared by 1.20.1 and 1.21.1; only the directory differs. */
+function entityLootJson(ctx: GenContext, entity: { loot: { item: string; min: number; max: number; chance: number }[] }): string {
+  const pools = entity.loot.map((drop) => {
+    const ref = resolveItemRef(ctx, drop.item, `entity loot item`);
+    const entry: Record<string, unknown> = { type: "minecraft:item", name: ref.value };
+    if (drop.min !== 1 || drop.max !== 1) {
+      // Vanilla always spells out the number-provider type; omitting it risks the "constant" default.
+      entry.functions = [
+        { function: "minecraft:set_count", count: { type: "minecraft:uniform", min: drop.min, max: drop.max } },
+      ];
+    }
+    const pool: Record<string, unknown> = { rolls: 1, entries: [entry] };
+    if (drop.chance < 1) pool.conditions = [{ condition: "minecraft:random_chance", chance: drop.chance }];
+    return pool;
+  });
+  return JSON.stringify(pools);
+}
+
+/**
+ * Entity generator: one mob class + renderer + loot table per entity, plus a single registry class.
+ * Base class, MobCategory, attribute base and the client model all come from adapter data, so the engine
+ * emits no version- or loader-specific Java itself (Principle 1).
+ */
+function genEntities(ctx: GenContext, javaDir: string): EntityGenOut {
+  const out: EntityGenOut = { files: [], entityRegistrations: [], attributeHooks: [], rendererRegistrations: [], registryInitCalls: [], langEntries: {} };
+  const entities = ctx.spec.content.entities;
+  if (entities.length === 0) return out;
+  const a = ctx.adapter;
+  if (
+    a.templates.entityClass === undefined ||
+    a.templates.entitiesRegistryClass === undefined ||
+    a.contentPaths.entityLootTable === undefined ||
+    a.langKeys.entity === undefined
+  ) {
+    throw new McmodError("ADAPTER_INVALID", `Adapter ${a.id} does not support content.entities: it declares no entity templates, loot path or lang key`, { adapterId: a.id });
+  }
+  const entityDir = `${javaDir}${a.entitySubpackage}/`;
+  const clientDir = `${javaDir}${a.clientSubpackage}/`;
+  const seen = new Set<string>();
+  for (const entity of entities) {
+    const where = `entity "${entity.id}"`;
+    if (seen.has(entity.id)) throw new McmodError("SPEC_INVALID", "Duplicate entity id " + entity.id);
+    seen.add(entity.id);
+    const kindKey = entity.kind;
+    const kind = a.entityKinds[kindKey];
+    if (kind === undefined) {
+      throw new McmodError("ADAPTER_INVALID", `Adapter ${a.id} has no entityKinds entry for kind "${kindKey}"`, { adapterId: a.id, kind: kindKey });
+    }
+    const model = a.entityModels[entity.model];
+    if (model === undefined) {
+      throw new McmodError("SPEC_INVALID", `${where}.model "${entity.model}" is not offered by adapter ${a.id}; available: ${Object.keys(a.entityModels).join(", ")}`, { id: entity.id });
+    }
+    const cls = `${a.mainClassSimpleName}${toPascalCase(entity.id)}Entity`;
+    const rendererCls = `${a.mainClassSimpleName}${toPascalCase(entity.id)}Renderer`;
+    const constName = `${entity.id.toUpperCase()}`;
+    const display = entity.name ?? toDisplayName(entity.id);
+    const vars: Record<string, string> = {
+      ...ctx.vars,
+      id: entity.id,
+      ENTITY_ID: entity.id,
+      ENTITY_CLASS: cls,
+      ENTITY_FQ: `${a.basePackagePattern.replace("{{modId}}", ctx.spec.mod.modId)}.${a.entitySubpackage}.${cls}`,
+      ENTITY_CONST: constName,
+      ENTITY_BASE_CLASS: kind.baseClass,
+      ENTITY_ATTRIBUTE_BASE: kind.attributeBase,
+      ENTITY_HEALTH: String(entity.health),
+      ENTITY_SPEED: String(entity.speed),
+      ENTITY_ATTACK_DAMAGE: String(entity.attackDamage),
+      ENTITY_FOLLOW_RANGE: String(entity.followRange),
+      ENTITY_WIDTH: String(entity.width),
+      ENTITY_HEIGHT: String(entity.height),
+      ENTITY_SHADOW: String(entity.shadow),
+      ENTITY_TRACKING_RANGE: String(Math.max(4, Math.min(16, Math.ceil(entity.followRange / 2)))),
+      ENTITY_CATEGORY: (entity.category ?? kind.category).toUpperCase(),
+      RENDERER_CLASS: rendererCls,
+      RENDERER_FQ: `${ctx.vars.clientPackageName}.${rendererCls}`,
+      ENTITIES_CLASS: `${a.mainClassSimpleName}Entities`,
+      ENTITIES_FQ: `${ctx.vars.packageName}.${a.mainClassSimpleName}Entities`,
+      MODEL_CLASS: model.modelClass,
+      MODEL_LAYER: model.modelLayer,
+      LOOT_POOLS_JSON: entityLootJson(ctx, entity),
+    };
+    out.files.push(
+      {
+        path: `${entityDir}${cls}.java`,
+        content: renderTemplate(a.templates.entityClass, vars, "entityClass"),
+        managed: true, executable: false, reason: `entity:${entity.id}:class`,
+      },
+      {
+        path: `${clientDir}${rendererCls}.java`,
+        content: renderTemplate(a.templates.entityRendererClass!, vars, "entityRendererClass"),
+        managed: true, executable: false, reason: `entity:${entity.id}:renderer`,
+      },
+      {
+        path: renderPath(a.contentPaths.entityLootTable, { ...vars, id: entity.id }, "contentPaths.entityLootTable"),
+        content: renderTemplate(a.templates.entityLootTable!, vars, "entityLootTable"),
+        managed: true, executable: false, reason: `entity:${entity.id}:loot`,
+      },
+    );
+    out.entityRegistrations.push(renderTemplate(a.templates.entityRegistration!, vars, "entityRegistration"));
+    out.attributeHooks.push(renderTemplate(a.templates.entityAttributeHook!, vars, "entityAttributeHook"));
+    out.rendererRegistrations.push(renderTemplate(a.templates.entityRendererRegistration!, vars, "entityRendererRegistration"));
+    out.langEntries[renderTemplate(a.langKeys.entity, { namespace: ctx.vars.namespace!, id: entity.id }, "langKeys.entity")] = display;
+  }
+  const registryVars = {
+    ...ctx.vars,
+    ENTITY_REGISTRATIONS: out.entityRegistrations.join("\n"),
+    ENTITY_ATTRIBUTE_HOOKS: out.attributeHooks.join("\n"),
+    ENTITIES_CLASS: `${a.mainClassSimpleName}Entities`,
+    ENTITIES_FQ: `${ctx.vars.packageName}.${a.mainClassSimpleName}Entities`,
+  };
+  out.files.push({
+    path: `${javaDir}${a.mainClassSimpleName}Entities.java`,
+    content: renderTemplate(a.templates.entitiesRegistryClass!, registryVars, "entitiesRegistryClass"),
+    managed: true, executable: false, reason: "entities-registry",
+  });
+  out.registryInitCalls.push(renderTemplate(a.templates.entitiesRegistryInit!, registryVars, "entitiesRegistryInit"));
+  return out;
+}
 export interface PlanOptions {
   /**
    * Resolve an adapter asset key to an absolute file path. Required when the adapter declares
@@ -535,10 +668,22 @@ export function planGeneration(spec: ModSpecT, adapter: AdapterRecordT, options:
     }
   }
 
+  // The adapter owns the source layout: sibling files live next to its main class. Never hard-code the
+  // java source root here.
+  const mainClassFile = adapter.projectFiles.find((f) => f.template === "mainClass");
+  if (mainClassFile === undefined) {
+    throw new McmodError("ADAPTER_INVALID", `Adapter ${adapter.id} has no projectFile using the "mainClass" template`, { adapterId: adapter.id });
+  }
+  const javaDir = renderPath(mainClassFile.path, ctx.vars, "mainClass").replace(/[^/]+$/, "");
+  // Entities are generated first: the skeleton (registry init) and the client bootstrap (renderers)
+  // both consume injection points that only they can fill.
+  const entities = genEntities(ctx, javaDir);
+  const injectionVars: Record<string, string> = { REGISTRY_INIT_CALLS: entities.registryInitCalls.join("\n") };
+
   for (const f of adapter.projectFiles) {
     files.push({
       path: renderPath(f.path, ctx.vars, `projectFile:${f.path}`),
-      content: renderTemplate(adapter.templates[f.template]!, ctx.vars, f.template),
+      content: renderTemplate(adapter.templates[f.template]!, { ...ctx.vars, ...injectionVars }, f.template),
       managed: f.managed,
       executable: f.executable,
       reason: "skeleton",
@@ -563,14 +708,6 @@ export function planGeneration(spec: ModSpecT, adapter: AdapterRecordT, options:
     });
   }
 
-  // Sibling source files live next to the adapter's main class (the adapter owns the source layout,
-  // e.g. src/main/java/<package>/ on Fabric and NeoForge). Never hard-code the java source root here.
-  const mainClassFile = adapter.projectFiles.find((f) => f.template === "mainClass");
-  if (mainClassFile === undefined) {
-    throw new McmodError("ADAPTER_INVALID", `Adapter ${adapter.id} has no projectFile using the "mainClass" template`, { adapterId: adapter.id });
-  }
-  const javaDir = renderPath(mainClassFile.path, ctx.vars, "mainClass").replace(/[^/]+$/, "");
-
   const items = genItems(ctx);
   const blocks = genBlocks(ctx);
   files.push(...items.files, ...blocks.files);
@@ -591,11 +728,11 @@ export function planGeneration(spec: ModSpecT, adapter: AdapterRecordT, options:
     managed: true, executable: false, reason: "blocks-registry",
   });
 
-  const ui = genUi(ctx, javaDir);
+  const ui = genUi(ctx, javaDir, entities.rendererRegistrations);
   const recipes = genRecipes(ctx);
   // Advancements consume recipe ids so they can reference "the recipe this unlocks" and derive an icon.
   const advancements = genAdvancements(ctx, recipes.results);
-  files.push(...ui.files, ...recipes.files, ...advancements.files);
+  files.push(...ui.files, ...recipes.files, ...advancements.files, ...entities.files);
 
   const langObj: Record<string, string> = {
     [renderTemplate(adapter.langKeys.itemGroup, { namespace: ctx.vars.namespace! }, "langKeys.itemGroup")]: ctx.vars.modName!,
@@ -603,6 +740,7 @@ export function planGeneration(spec: ModSpecT, adapter: AdapterRecordT, options:
     ...blocks.langEntries,
     ...ui.langEntries,
     ...advancements.langEntries,
+    ...entities.langEntries,
   };
   files.push({
     path: renderPath(adapter.contentPaths.lang, ctx.vars, "contentPaths.lang"),

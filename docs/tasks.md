@@ -25,6 +25,14 @@
 - `packages/api`：`node:http` JSON API（`/api/versions`、`/api/validate`、`/api/generate` 等）。
 - 测试分布：core 14、adapters 10、cli 4、mcp-server 6、api 6。
 
+## S9 交付物（实体，已完成）
+
+- Spec 新增 `content.entities[]`：kind/category、生命/速度/攻击/索敌、体积与阴影、复用模型、掉落表。
+- 引擎 `genEntities`：实体类 + 渲染器 + 实体注册类 + 掉落表 + 语言键，并向主类注入 `{{REGISTRY_INIT_CALLS}}`、向客户端引导注入 `{{ENTITY_RENDERER_REGISTRATIONS}}`（普通项目文件也能被生成器接线）。
+- 适配器新增 8 个实体模板与 `entityKinds`/`entityModels` 数据；掉落表目录按版本分叉。
+- 验收：Fabric PASS(122s) / Forge PASS(45s)，实体类/渲染器/注册类/掉落表进 jar；63 项测试通过。
+- 未生成（记录在案）：AI 目标、生成蛋、贴图、运行时行为。
+
 ## S8 交付物（配方 + 进度，已完成）
 
 - Spec 新增 `content.recipes[]`（7 种配方类型，含 pattern/key/ingredients/ingredient/experience/cookingTime/count/group 与跨字段校验）与 `content.advancements[]`（父子树、icon、unlockRecipes、hasItems、frame/展示开关、根进度背景）。

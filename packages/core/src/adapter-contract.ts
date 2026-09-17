@@ -35,6 +35,8 @@ export const ContentPathsSpec = z.object({
   recipe: z.string().optional(),
   /** Optional: required only by adapters that support content.advancements. */
   advancement: z.string().optional(),
+  /** Optional: required only by adapters that support content.entities. */
+  entityLootTable: z.string().optional(),
 });
 
 export const LangKeysSpec = z.object({
@@ -49,6 +51,8 @@ export const LangKeysSpec = z.object({
   /** Optional: required only by adapters that support content.advancements. */
   advancementTitle: z.string().optional(),
   advancementDescription: z.string().optional(),
+  /** Optional: required only by adapters that support content.entities. */
+  entity: z.string().optional(),
 });
 
 /** Template keys the built-in generators require. */
@@ -99,6 +103,18 @@ export const ADVANCEMENT_TEMPLATE_KEYS = ["advancement", "advancementItemPredica
 /** Language keys the advancement generator needs. */
 export const ADVANCEMENT_LANG_KEYS = ["advancementTitle", "advancementDescription"] as const;
 
+/** Template keys the entity generator needs (all-or-nothing, like the UI set). */
+export const ENTITY_TEMPLATE_KEYS = [
+  "entityClass",
+  "entitiesRegistryClass",
+  "entitiesRegistryInit",
+  "entityRegistration",
+  "entityAttributeHook",
+  "entityRendererClass",
+  "entityRendererRegistration",
+  "entityLootTable",
+] as const;
+
 export const AdapterRecord = z.object({
   /** e.g. "fabric-1.21.1" */
   id: z.string().regex(/^(fabric|neoforge|forge)-\d+\.\d+(\.\d+)?$/),
@@ -118,8 +134,31 @@ export const AdapterRecord = z.object({
    * "org.lwjgl.glfw.GLFW.GLFW_KEY_{{KEY}}". Lives here because the input API differs per version.
    */
   keyCodePattern: z.string().default("org.lwjgl.glfw.GLFW.GLFW_KEY_{{KEY}}"),
-  /** Sub-package holding client-only classes (screens, key handling). */
+  /** Sub-package holding client-only classes (screens, key handling, entity renderers). */
   clientSubpackage: z.string().default("client"),
+  /** Sub-package holding common (server+client) content classes such as entity types. */
+  entitySubpackage: z.string().default("entity"),
+  /**
+   * Vanilla models a generated entity renderer may reuse: spec key -> the model class and its
+   * ModelLayer constant. Lives here because both names change across versions.
+   */
+  entityModels: z
+    .record(z.string(), z.object({ modelClass: z.string(), modelLayer: z.string() }))
+    .default({}),
+  /**
+   * Mob kinds the spec may ask for: the base class, the attribute-builder source expression and the
+   * default MobCategory key. Java fragments live here (not in the engine) so a version that renames
+   * any of them only needs a data change.
+   */
+  entityKinds: z
+    .record(
+      z.string(),
+      z.object({ baseClass: z.string(), attributeBase: z.string(), category: z.string() }),
+    )
+    .default({
+      monster: { baseClass: "Monster", attributeBase: "Monster.createMonsterAttributes()", category: "monster" },
+      creature: { baseClass: "PathfinderMob", attributeBase: "Mob.createMobAttributes()", category: "creature" },
+    }),
   /** Extra build facts flattened into vars as {{gradle_<key>}} (versions, plugin ids, ...). */
   gradle: z.record(z.string(), z.unknown()),
   /** group key -> constant expression usable inside the registration template. */
@@ -190,6 +229,15 @@ const REQUIRED_PLACEHOLDERS: Record<string, string[]> = {
   advancement: ["{{ADV_ICON_ITEM}}", "{{ADV_TITLE_JSON}}", "{{ADV_CRITERIA_JSON}}", "{{ADV_REQUIREMENTS_JSON}}"],
   advancementItemPredicate: ["{{ITEM_ID}}"],
   advancementTagPredicate: ["{{TAG_ID}}"],
+  // Entity templates (present only on entity-capable adapters).
+  entityClass: ["{{ENTITY_CLASS}}", "{{ENTITY_HEALTH}}", "{{ENTITY_ATTACK_DAMAGE}}", "{{ENTITY_ATTRIBUTE_BASE}}"],
+  entitiesRegistryClass: ["{{ENTITY_REGISTRATIONS}}", "{{ENTITY_ATTRIBUTE_HOOKS}}"],
+  entitiesRegistryInit: ["{{ENTITIES_CLASS}}"],
+  entityRegistration: ["{{ENTITY_CONST}}", "{{ENTITY_ID}}"],
+  entityAttributeHook: ["{{ENTITY_CONST}}", "{{ENTITY_FQ}}"],
+  entityRendererClass: ["{{ENTITY_CLASS}}", "{{MODEL_CLASS}}", "{{MODEL_LAYER}}", "{{ENTITY_ID}}"],
+  entityRendererRegistration: ["{{ENTITY_CONST}}", "{{RENDERER_FQ}}"],
+  entityLootTable: ["{{LOOT_POOLS_JSON}}"],
 };
 
 /** Static sanity checks beyond the schema: referenced template keys must exist and stay wired up. */
@@ -240,6 +288,29 @@ export function lintAdapter(a: AdapterRecordT): string[] {
     else {
       if (!path.includes("{{id}}")) problems.push("contentPaths.recipe must contain {{id}} or every recipe overwrites the same file");
       if (!path.includes("{{namespace}}")) problems.push("contentPaths.recipe must contain {{namespace}}");
+    }
+  }
+  // Entities: registry class, attributes hook and client renderer all differ per loader.
+  const entityTemplates = ENTITY_TEMPLATE_KEYS.filter((k) => k in a.templates);
+  if (entityTemplates.length > 0) {
+    const missing = ENTITY_TEMPLATE_KEYS.filter((k) => !(k in a.templates));
+    if (missing.length > 0) problems.push(`adapter declares entity support but is missing entity template(s): ${missing.join(", ")}`);
+    if (a.contentPaths.entityLootTable === undefined) problems.push("adapter declares entity templates but no contentPaths.entityLootTable");
+    if (a.langKeys.entity === undefined) problems.push("adapter declares entity support but no langKeys.entity");
+    if (Object.keys(a.entityModels).length === 0) problems.push("adapter declares entity support but entityModels is empty");
+    for (const [key, k] of Object.entries(a.entityKinds)) {
+      if (!k.baseClass || !k.attributeBase || !k.category) problems.push(`entityKinds.${key} needs baseClass, attributeBase and category`);
+    }
+    if (a.entityKinds.monster === undefined) problems.push("entityKinds must define the default \"monster\" kind");
+    for (const [key, m] of Object.entries(a.entityModels)) {
+      if (!m.modelClass.includes(".")) problems.push(`entityModels.${key}.modelClass must be a fully qualified class name`);
+      if (!m.modelLayer.includes(".")) problems.push(`entityModels.${key}.modelLayer must be a fully qualified constant`);
+    }
+    if (!(a.templates.mainClass ?? "").includes("{{REGISTRY_INIT_CALLS}}")) {
+      problems.push("adapter declares entity support but mainClass template has no {{REGISTRY_INIT_CALLS}} injection point");
+    }
+    if (!(a.templates.clientBootstrap ?? "").includes("{{ENTITY_RENDERER_REGISTRATIONS}}")) {
+      problems.push("adapter declares entity support but clientBootstrap has no {{ENTITY_RENDERER_REGISTRATIONS}} injection point");
     }
   }
   // Advancements: same reasoning (advancements/ on 1.20.1, advancement/ on 1.21+).

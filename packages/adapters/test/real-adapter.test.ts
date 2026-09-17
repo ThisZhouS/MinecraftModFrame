@@ -148,6 +148,42 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
     }
   });
 
+  it("generates the entity slice for every adapter, with the version's loot directory", () => {
+    for (const a of listAdapters()) {
+      const p = a.id === adapter.id ? plan : planProject(spec, a);
+      const paths = p.files.map((f) => f.path);
+      expect(paths, a.id + " entity class").toContain("src/main/java/com/examplemod/entity/ModMainRubyGolemEntity.java");
+      expect(paths, a.id + " renderer").toContain("src/main/java/com/examplemod/client/ModMainRubyGolemRenderer.java");
+      expect(paths, a.id + " registry").toContain("src/main/java/com/examplemod/ModMainEntities.java");
+      const lootDir = a.mcVersion.startsWith("1.21") ? "/loot_table/entities/" : "/loot_tables/entities/";
+      expect(paths.some((x) => x.includes(lootDir + "ruby_golem.json")), a.id + " loot path").toBe(true);
+
+      const main = p.files.find((f) => f.path.endsWith("ModMain.java"))!.content;
+      expect(main, a.id + " registry init call").toContain("ModMainEntities.");
+      const boot = p.files.find((f) => f.path.endsWith("ModMainClient.java"))!.content;
+      expect(boot, a.id + " renderer registration").toContain("ModMainRubyGolemRenderer");
+      const loot = JSON.parse(p.files.find((f) => f.path.endsWith("ruby_golem.json"))!.content);
+      expect(loot.type).toBe("minecraft:entity");
+      expect(loot.pools[0].entries[0].name).toBe("examplemod:ruby");
+      expect(loot.pools[0].entries[0].functions[0].count).toEqual({ type: "minecraft:uniform", min: 1, max: 2 });
+      const lang = JSON.parse(p.files.find((f) => f.path.endsWith("lang/en_us.json"))!.content);
+      expect(lang["entity.examplemod.ruby_golem"]).toBe("Ruby Golem");
+    }
+  });
+
+  it("keeps entity attributes and the client model inside adapter data (no version branches in the engine)", () => {
+    for (const a of listAdapters()) {
+      expect(Object.keys(a.entityKinds).length, a.id).toBeGreaterThan(0);
+      expect(a.entityKinds.monster.attributeBase).toMatch(/createMonsterAttributes|createMobAttributes/);
+      for (const model of Object.values(a.entityModels)) {
+        expect(model.modelClass).toMatch(/^net\.minecraft\./);
+        expect(model.modelLayer).toMatch(/^net\.minecraft\..*ModelLayers\.[A-Z_]+$/);
+      }
+      expect(a.templates.mainClass).toContain("{{REGISTRY_INIT_CALLS}}");
+      expect(a.templates.clientBootstrap).toContain("{{ENTITY_RENDERER_REGISTRATIONS}}");
+    }
+  });
+
   it("every adapter declares the build facts the generator relies on", () => {
     for (const a of listAdapters()) {
       expect(a.java).toBeGreaterThanOrEqual(8);

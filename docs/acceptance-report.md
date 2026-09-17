@@ -8,10 +8,12 @@
 | 层级 | 内容 | 结果 |
 | --- | --- | --- |
 | L1 静态 | 5 个包 `tsc`（build 内置） | ✅ 通过 |
-| L2 单元/组件 | core / adapters / cli / mcp-server / api 的 vitest 用例 | ✅ **61 passed**（见 §2） |
+| L2 单元/组件 | core / adapters / cli / mcp-server / api 的 vitest 用例 | ✅ **63 passed**（见 §2） |
 | L3 集成（三面） | CLI 端到端生成、MCP stdio JSON-RPC 全链路、HTTP API 端点 | ✅ 通过（见 §3） |
-| L4 真编译（内容） | 物品/方块/资源/数据包生成结果在目标 JDK + Gradle 下 `build` | ✅ Fabric 1.21.1、✅ Forge 1.20.1；⛔ NeoForge（见 §9.1） |
+| L4 真编译（内容） | 物品/方块/资源/数据包生成结果在目标 JDK + Gradle 下 `build` | ✅ Fabric 1.21.1、✅ Forge 1.20.1；⛔ NeoForge（见 §10.1） |
 | L4 真编译（UI） | Screen + 按键绑定 + 客户端引导生成结果 `build` | ✅ Fabric 1.21.1（1m58s）、✅ Forge 1.20.1（30s）（见 §6） |
+| L4 真编译（配方/进度） | 数据包 JSON 生成结果 `build` 且文件进 jar | ✅ 两版（见 §7） |
+| L4 真编译（实体） | 实体类 + 渲染器 + 注册类 + 掉落表 `build` 且进 jar | ✅ 两版（见 §8） |
 | L5 一键复验 | `scripts/verify-build.mjs` 按适配器声明的 Gradle 线自动复跑编译 | ✅ 已交付（见 §9） |
 
 ## 2. L2 单元与组件测试
@@ -26,7 +28,7 @@
 | `@mcmodkit/mcp-server` | 6 | 工具定义与 `callTool` 分发、错误信封 | ✅ |
 | `@mcmodkit/api` | 6 | 路由与状态码（200/400/404/500）、信封结构 | ✅ |
 
-合计 **61 passed / 0 failed**。护栏在迭代中反复拦截真实缺陷：Forge 模板注释硬编码 MC 版本、UI 契约「只实现一半」、Screen 的 `renderBackground` 版本签名写错。
+合计 **63 passed / 0 failed**。护栏在迭代中反复拦截真实缺陷：Forge 模板注释硬编码 MC 版本、UI 契约「只实现一半」、Screen 的 `renderBackground` 版本签名写错。
 
 ## 3. L3 集成：三个智能体接入面
 
@@ -125,16 +127,57 @@ Spec 里一段声明：
 | 真编译 | Fabric **PASS（122s）**、Forge **PASS（44s）**，jar 内含全部 6 个数据文件 |
 | 单测 | 61 passed（core 29 / adapters 16 / cli 4 / mcp 6 / api 6），含配方/进度的引擎逻辑、默认烹饪时间、判据与 rewards、父级引用、非法引用的字段级报错、两版方言护栏、所有生成 JSON 可解析 |
 | 人工比对 | 生成文件与原版样本逐字段一致（见 §7.2 表） |
-## 8. 本轮交付的其他能力
+## 8. 数据切片（三）：实体（本轮新增）
+
+### 8.1 一份 Spec 生成一只怪
+
+```jsonc
+"entities": [ { "id": "ruby_golem", "kind": "monster", "health": 30, "speed": 0.28, "attackDamage": 5,
+                "followRange": 24, "width": 0.9, "height": 1.6, "shadow": 0.7, "model": "cow",
+                "loot": [ { "item": "ruby", "min": 1, "max": 2 }, { "item": "charged_ruby", "chance": 0.25 } ] } ]
+```
+
+产出 4 个新文件（工程 38 个文件）：`entity/<Mod><Id>Entity.java`（实体类 + 属性）、`client/<Mod><Id>Renderer.java`（渲染器）、`<Mod>Entities.java`（实体类型与属性注册）、`data/<ns>/loot_table(s)/entities/<id>.json`（掉落表）；同时语言键与主类/客户端引导的注入点自动接线。
+
+### 8.2 真编译证据
+
+| 目标 | 结果 | jar 内容（实测） |
+| --- | --- | --- |
+| Fabric 1.21.1 | ✅ **BUILD SUCCESSFUL（122s）** | jar 20,646 B：`ModMainEntities.class`、`entity/ModMainRubyGolemEntity.class`、`client/ModMainRubyGolemRenderer.class`、`data/verifyfabric/loot_table/entities/ruby_golem.json` |
+| Forge 1.20.1 | ✅ **BUILD SUCCESSFUL（45s）** | jar 23,816 B：`ModMainEntities{,$ModBus}.class`、`entity/ModMainRubyGolemEntity.class`、`client/ModMainRubyGolemRenderer{,$ModBus}.class`、`data/verifyforge/loot_tables/entities/ruby_golem.json` |
+
+### 8.3 版本/加载器差异全部落在数据层
+
+| 关注点 | 处理方式（都在适配器 JSON 里） |
+| --- | --- |
+| 实体注册 | Fabric 用 `Registry.register(BuiltInRegistries.ENTITY_TYPE, …)`；Forge/NeoForge 用 `DeferredRegister` + 主类注入的 `register(modEventBus)` |
+| 属性注册 | Fabric 在 `init()` 里调 `FabricDefaultAttributeRegistry.register`；Forge/NeoForge 走 MOD 总线的 `EntityAttributeCreationEvent`（注册类内自带 `@EventBusSubscriber`/嵌套 `ModBus`） |
+| 渲染器注册 | Fabric `EntityRendererRegistry.register`；Forge/NeoForge `EntityRenderersEvent.RegisterRenderers` 里的 `event.registerEntityRenderer(…)` |
+| 基类与属性来源 | `entityKinds`：`monster → Monster.createMonsterAttributes()`、`creature → PathfinderMob + Mob.createMobAttributes()` |
+| 客户端模型 | `entityModels`：`pig/cow/chicken/sheep` → 模型类 + `ModelLayers.X` 常量（两版同名，已 `javap` 取证） |
+| 掉落表目录 | 1.21 `loot_table/entities/`；1.20.1 `loot_tables/entities/` |
+
+### 8.4 本轮由「原版数据对照」修正的一处
+
+掉落表的 `set_count.count` **必须显式写出数值来源类型**（`{"type": "minecraft:uniform", "min": 1, "max": 2}`）。最初省略 `type`，与 jar 内 `data/minecraft/loot_tables/entities/pig.json` 对照后补上——`minecraft:constant` 是默认值，省略会改变语义。这是又一次「编译不校验 JSON 语义、必须以原版数据为准」的实例。
+
+### 8.5 验收
+
+| 项 | 证据 |
+| --- | --- |
+| 真编译 | Fabric PASS（122s）、Forge PASS（45s），实体类/渲染器/注册类/掉落表全部进 jar |
+| 单测 | **63 passed**（core 29 / adapters 18 / cli 4 / mcp 6 / api 6）：新增实体切片逐适配器断言、掉落表结构、语言键、注册注入点、以及「属性基类与模型只在适配器数据里」的原则守卫 |
+| 未覆盖（诚实记录） | 实体 AI 目标（`registerGoals`）、生成蛋、贴图与运行时行为均未生成；渲染器复用原版模型（`model` 字段选 pig/cow/chicken/sheep），贴图需自备 |
+## 9. 本轮交付的其他能力
 
 - Spec 新增 `ui.screens[]`（id/title/key/width/height/lines），缺省值可省略；非法键给出字段级报错。
 - 适配器契约新增 `keyCodePattern`（键码表达式，默认 `org.lwjgl.glfw.GLFW.GLFW_KEY_{{KEY}}`）与 `clientSubpackage`；UI 模板「可选但全有或全无」，由 lint 强制。
 - `scripts/verify-build.mjs`：一键复验，按适配器声明的 wrapper 版本选 Gradle 线。
 - Gradle 9.5.1 经腾讯云镜像重新取得（`services.gradle.org` 会跳转到被阻断的 github.com），Fabric 线复验能力恢复。
 
-## 9. 阻塞 / 跳过 / 不适用
+## 10. 阻塞 / 跳过 / 不适用
 
-### 9.1 NeoForge 1.21.1 真编译 —— ⛔ 阻塞（环境）
+### 10.1 NeoForge 1.21.1 真编译 —— ⛔ 阻塞（环境）
 
 | 尝试 | 配置 | 结果 | 说明 |
 | --- | --- | --- | --- |
@@ -147,7 +190,7 @@ Spec 里一段声明：
 
 结论：**本机无法完成 NeoForge 编译验证**。`neoforge-1.21.1` 一律标注「已生成，未编译验证」。对照经验：Forge 线同样的模板结构被编译器抓出 3 处 API 错误（§5、§6.4），静态检查无法替代编译。
 
-### 9.2 其他阻塞 / 跳过
+### 10.2 其他阻塞 / 跳过
 
 | 项 | 状态 | 原因与影响 |
 | --- | --- | --- |
@@ -157,7 +200,7 @@ Spec 里一段声明：
 | MC 26.x（Java 25）目标 | ⏭ 跳过 | 无 JDK 25；未纳入本期适配器 |
 | Linux/macOS 生成与构建 | ⏭ 跳过 | 本机为 Windows；已用 posix 相对路径 + `executable` 位降低风险，未实测 |
 
-## 10. 一键复验 / Re-verification
+## 11. 一键复验 / Re-verification
 
 ```bash
 pnpm -r build && pnpm -r test            # 50 passed
@@ -169,9 +212,9 @@ node scripts/verify-build.mjs --adapter forge-1.20.1 \
 
 脚本按**适配器声明的 `gradleWrapperVersion`** 选择 Gradle 线，缺工具链时如实报 `SKIPPED`；失败退出码 1，并在 `Temp/verify-build/<adapter>/build.log` 留完整日志。
 
-## 11. 遗留风险与缺口
+## 12. 遗留风险与缺口
 
-1. **NeoForge 未编译验证**：见 §9.1；在能访问 `maven.neoforged.net` 的机器上跑 `verify-build.mjs --adapter neoforge-1.21.1` 即可补齐。
+1. **NeoForge 未编译验证**：见 §10.1；在能访问 `maven.neoforged.net` 的机器上跑 `verify-build.mjs --adapter neoforge-1.21.1` 即可补齐。
 2. **UI 只到「可编译」**：没有运行时验证（无法在无图形环境启动客户端），也没有贴图/字体/交互逻辑（输入框、列表、滚动）。
 3. **版本漂移**：适配器钉住的版本号会随上游变旧，需要版本巡检工作流（数据源见 docs/research/2026-09-version-api-knowledge.md §2.4）。
 4. **贴图缺失**：物品/方块贴图需自备（生成工程 README 已明确）。
