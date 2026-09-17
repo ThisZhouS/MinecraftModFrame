@@ -59,3 +59,21 @@ Minecraft 官方支持在**构建期**用 Java 代码（`DataProvider`）产出�
 先做 **B**：它把「能不能用官方 datagen」这个门槛降为零，成本可控（每加载器 1 个入口类 + 1 处 Gradle 接线），且不会与现有 JSON 路径产生重复维护压力。若日后确实需要 C，再按内容类型增量推进。
 
 > 需要决策：选 A / B / C？选 B 或 C 时，是否接受验收标准从「编译通过」扩展为「运行 datagen 并产出一致结果」（分钟级、需完整 MC 资源）？
+
+## 7. 执行记录：方案 B 已落地（2026-09-15）
+
+未等到决策前先按建议落地 **B**，因为它可逆、且不与现有 JSON 路径重叠（若最终选 A，只需不用 `datagen: true`；选 C 则在 B 的骨架上增量加 provider）。
+
+**Spec**：新增顶层开关 `"datagen": true`（默认 false，关闭时工程与之前完全一致）。
+
+**产出**（仅当开关打开时）：`<pkg>/datagen/<Mod>DataGen.java`（加载器对应的数据生成入口）+ `<pkg>/datagen/<Mod>ExampleProvider.java`（最小可用 provider：向数据包写一个标记 JSON，示范 `DataProvider.saveStable` 用法）+ 构建脚本里的数据任务接线（Fabric `loom { runs { datagen { … } } }`；Forge/NeoForge `runs { data { … } }` 与 `src/generated/resources` 资源目录）。Fabric 另在 `fabric.mod.json` 写入 `fabric-datagen` entrypoint。
+
+**验收证据**：
+
+| 项 | 证据 |
+| --- | --- |
+| 真编译 | Fabric **PASS（117s）**、Forge **PASS（45s）**，jar 内均含 `datagen/ModMainDataGen.class` 与 `datagen/ModMainExampleProvider.class` |
+| Gradle 任务确实存在 | Fabric `gradle tasks --all` 列出 **`runDatagen - Starts the 'datagen' run configuration`**；Forge 列出 **`prepareRunData` / `prepareRunDataCompile`** 任务族 |
+| 关闭开关不残留 | 单测断言：`datagen:false` 时不产生任何 `datagen/` 文件、构建脚本无 `runData*` 接线、元数据无 `fabric-datagen` 条目 |
+| 编译器抓到的两处错误（已修） | ① Fabric `pack.addProvider(Provider::new)` 重载歧义（`FabricDataGenerator.Pack` 同时继承 `DataGenerator.PackGenerator`）→ 显式写目标类型 `(FabricDataGenerator.Pack.Factory<T>)`；② Forge/NeoForge 的 datagen 类在子包中引用主类常量 `MOD_ID` 缺 `import` |
+| **未做** | **没有实际运行 datagen**（`runDatagen`/`runData` 未执行）：需要完整 MC 资源环境与分钟级运行，且运行产物与现有 JSON 路径重叠。因此运行时行为仍属未验证 |

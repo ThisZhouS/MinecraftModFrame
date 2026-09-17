@@ -32,6 +32,7 @@
 | FR-16 | 生成配方：有序/无序合成、熔炼、高炉、烟熏、营火、切石；引用本 mod 内容或原版物品；按版本写出正确的 JSON 方言与数据包目录 | 生成 jar 内 `data/<ns>/recipe(s)/*.json`，与原版样本逐字段一致 | ✅ 两版编译验证 + 方言护栏 |
 | FR-17 | 生成进度：根/子进度树、图标、判据（解锁配方 / 持有物品）、`rewards.recipes` 配方书解锁、语言键 | 生成 `data/<ns>/advancement(s)/*.json` + lang | ✅ 两版编译验证 |
 | FR-18 | 生成实体：实体类（属性/体积）、实体类型与属性注册（三加载器各自的机制）、渲染器（复用原版模型）、掉落表、语言键 | jar 内含实体类/渲染器/注册类/掉落表；两版编译通过 | ✅ 两版编译验证 |
+| FR-20 | datagen（可选）：`datagen: true` 时生成加载器对应的数据生成入口 + 最小示例 provider + 构建脚本数据任务接线；关闭时零残留 | 生成 `datagen/<Mod>DataGen.java`、`<Mod>ExampleProvider.java`；Gradle 列出 `runDatagen`/`runData` | ✅ 编译验证 + 任务存在性验证（**未运行 datagen**） |
 | FR-19 | 实体的版本/加载器差异（注册方式、属性事件、渲染器事件、模型类与层常量、掉落表目录）全部来自适配器数据 | `entityKinds`/`entityModels`/模板；引擎零分支（有护栏测试） | ✅ |
 
 ## 3. 非功能需求

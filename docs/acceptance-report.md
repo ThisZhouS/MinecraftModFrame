@@ -8,12 +8,13 @@
 | 层级 | 内容 | 结果 |
 | --- | --- | --- |
 | L1 静态 | 5 个包 `tsc`（build 内置） | ✅ 通过 |
-| L2 单元/组件 | core / adapters / cli / mcp-server / api 的 vitest 用例 | ✅ **63 passed**（见 §2） |
+| L2 单元/组件 | core / adapters / cli / mcp-server / api 的 vitest 用例 | ✅ **65 passed**（见 §2） |
 | L3 集成（三面） | CLI 端到端生成、MCP stdio JSON-RPC 全链路、HTTP API 端点 | ✅ 通过（见 §3） |
-| L4 真编译（内容） | 物品/方块/资源/数据包生成结果在目标 JDK + Gradle 下 `build` | ✅ Fabric 1.21.1、✅ Forge 1.20.1；⛔ NeoForge（见 §10.1） |
+| L4 真编译（内容） | 物品/方块/资源/数据包生成结果在目标 JDK + Gradle 下 `build` | ✅ Fabric 1.21.1、✅ Forge 1.20.1；⛔ NeoForge（见 §11.1） |
 | L4 真编译（UI） | Screen + 按键绑定 + 客户端引导生成结果 `build` | ✅ Fabric 1.21.1（1m58s）、✅ Forge 1.20.1（30s）（见 §6） |
 | L4 真编译（配方/进度） | 数据包 JSON 生成结果 `build` 且文件进 jar | ✅ 两版（见 §7） |
 | L4 真编译（实体） | 实体类 + 渲染器 + 注册类 + 掉落表 `build` 且进 jar | ✅ 两版（见 §8） |
+| L4 datagen（方案 B） | 数据生成入口 + provider `build` 且进 jar；Gradle 数据任务存在 | ✅ 两版；⚠️ **未运行** datagen（见 §9） |
 | L5 一键复验 | `scripts/verify-build.mjs` 按适配器声明的 Gradle 线自动复跑编译 | ✅ 已交付（见 §9） |
 
 ## 2. L2 单元与组件测试
@@ -28,7 +29,7 @@
 | `@mcmodkit/mcp-server` | 6 | 工具定义与 `callTool` 分发、错误信封 | ✅ |
 | `@mcmodkit/api` | 6 | 路由与状态码（200/400/404/500）、信封结构 | ✅ |
 
-合计 **63 passed / 0 failed**。护栏在迭代中反复拦截真实缺陷：Forge 模板注释硬编码 MC 版本、UI 契约「只实现一半」、Screen 的 `renderBackground` 版本签名写错。
+合计 **65 passed / 0 failed**。护栏在迭代中反复拦截真实缺陷：Forge 模板注释硬编码 MC 版本、UI 契约「只实现一半」、Screen 的 `renderBackground` 版本签名写错。
 
 ## 3. L3 集成：三个智能体接入面
 
@@ -168,16 +169,29 @@ Spec 里一段声明：
 | 真编译 | Fabric PASS（122s）、Forge PASS（45s），实体类/渲染器/注册类/掉落表全部进 jar |
 | 单测 | **63 passed**（core 29 / adapters 18 / cli 4 / mcp 6 / api 6）：新增实体切片逐适配器断言、掉落表结构、语言键、注册注入点、以及「属性基类与模型只在适配器数据里」的原则守卫 |
 | 未覆盖（诚实记录） | 实体 AI 目标（`registerGoals`）、生成蛋、贴图与运行时行为均未生成；渲染器复用原版模型（`model` 字段选 pig/cow/chicken/sheep），贴图需自备 |
-## 9. 本轮交付的其他能力
+## 9. datagen（方案 B，本轮新增）
+
+开关式能力：Spec 顶层 `"datagen": true` 时，生成 ① 加载器对应的数据生成入口类 ② 最小示例 provider（演示 `DataProvider.saveStable`）③ 构建脚本的数据任务接线与生成资源目录；Fabric 另写入 `fabric-datagen` entrypoint。默认关闭，关闭时工程与之前逐字节一致。
+
+| 项 | 证据 |
+| --- | --- |
+| 真编译 | Fabric **PASS（117s）**、Forge **PASS（45s）**；jar 内含 `datagen/ModMainDataGen.class`、`datagen/ModMainExampleProvider.class`（Fabric jar 22,817 B / Forge jar 25,922 B） |
+| 任务存在性 | Fabric `gradle tasks --all` 列出 `runDatagen - Starts the 'datagen' run configuration`；Forge 列出 `prepareRunData`、`prepareRunDataCompile` |
+| 关闭时零残留 | 单测：`datagen:false` ⇒ 无 `datagen/` 文件、构建脚本无 `runData*`、元数据无 `fabric-datagen` |
+| 编译器抓到的缺陷（已修） | ① Fabric `pack.addProvider(Provider::new)` 重载歧义（`FabricDataGenerator.Pack` 亦继承 `DataGenerator.PackGenerator`）→ 显式目标类型转换；② Forge/NeoForge 的 datagen 类在子包引用主类 `MOD_ID` 缺 `import` |
+| **明确未做** | **没有运行 datagen**（`runDatagen`/`runData` 未执行）——运行时行为未验证；这是本轮唯一的「编译/任务存在 ≠ 运行成功」缺口 |
+
+评估与三选项（A 不做 / B 最小接线 / C 完整 provider）见 `docs/datagen-evaluation.md`；本轮落地的是可逆的 B。
+## 10. 本轮交付的其他能力
 
 - Spec 新增 `ui.screens[]`（id/title/key/width/height/lines），缺省值可省略；非法键给出字段级报错。
 - 适配器契约新增 `keyCodePattern`（键码表达式，默认 `org.lwjgl.glfw.GLFW.GLFW_KEY_{{KEY}}`）与 `clientSubpackage`；UI 模板「可选但全有或全无」，由 lint 强制。
 - `scripts/verify-build.mjs`：一键复验，按适配器声明的 wrapper 版本选 Gradle 线。
 - Gradle 9.5.1 经腾讯云镜像重新取得（`services.gradle.org` 会跳转到被阻断的 github.com），Fabric 线复验能力恢复。
 
-## 10. 阻塞 / 跳过 / 不适用
+## 11. 阻塞 / 跳过 / 不适用
 
-### 10.1 NeoForge 1.21.1 真编译 —— ⛔ 阻塞（环境）
+### 11.1 NeoForge 1.21.1 真编译 —— ⛔ 阻塞（环境）
 
 | 尝试 | 配置 | 结果 | 说明 |
 | --- | --- | --- | --- |
@@ -190,7 +204,7 @@ Spec 里一段声明：
 
 结论：**本机无法完成 NeoForge 编译验证**。`neoforge-1.21.1` 一律标注「已生成，未编译验证」。对照经验：Forge 线同样的模板结构被编译器抓出 3 处 API 错误（§5、§6.4），静态检查无法替代编译。
 
-### 10.2 其他阻塞 / 跳过
+### 11.2 其他阻塞 / 跳过
 
 | 项 | 状态 | 原因与影响 |
 | --- | --- | --- |
@@ -200,7 +214,7 @@ Spec 里一段声明：
 | MC 26.x（Java 25）目标 | ⏭ 跳过 | 无 JDK 25；未纳入本期适配器 |
 | Linux/macOS 生成与构建 | ⏭ 跳过 | 本机为 Windows；已用 posix 相对路径 + `executable` 位降低风险，未实测 |
 
-## 11. 一键复验 / Re-verification
+## 12. 一键复验 / Re-verification
 
 ```bash
 pnpm -r build && pnpm -r test            # 50 passed
@@ -212,9 +226,9 @@ node scripts/verify-build.mjs --adapter forge-1.20.1 \
 
 脚本按**适配器声明的 `gradleWrapperVersion`** 选择 Gradle 线，缺工具链时如实报 `SKIPPED`；失败退出码 1，并在 `Temp/verify-build/<adapter>/build.log` 留完整日志。
 
-## 12. 遗留风险与缺口
+## 13. 遗留风险与缺口
 
-1. **NeoForge 未编译验证**：见 §10.1；在能访问 `maven.neoforged.net` 的机器上跑 `verify-build.mjs --adapter neoforge-1.21.1` 即可补齐。
+1. **NeoForge 未编译验证**：见 §11.1；在能访问 `maven.neoforged.net` 的机器上跑 `verify-build.mjs --adapter neoforge-1.21.1` 即可补齐。
 2. **UI 只到「可编译」**：没有运行时验证（无法在无图形环境启动客户端），也没有贴图/字体/交互逻辑（输入框、列表、滚动）。
 3. **版本漂移**：适配器钉住的版本号会随上游变旧，需要版本巡检工作流（数据源见 docs/research/2026-09-version-api-knowledge.md §2.4）。
 4. **贴图缺失**：物品/方块贴图需自备（生成工程 README 已明确）。

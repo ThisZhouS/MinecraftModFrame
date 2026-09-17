@@ -25,6 +25,13 @@
 - `packages/api`：`node:http` JSON API（`/api/versions`、`/api/validate`、`/api/generate` 等）。
 - 测试分布：core 14、adapters 10、cli 4、mcp-server 6、api 6。
 
+## S10 交付物（datagen 方案 B，已完成）
+
+- Spec 开关 `datagen`（默认 false）；三适配器各新增 3 个模板（dataGenClass / dataGenProvider / dataGenRunConfig）。
+- 产出加载器数据生成入口 + 最小示例 provider + `runDatagen`(Fabric)/`runData`(Forge/NeoForge) 接线与生成资源目录；Fabric 写入 `fabric-datagen` entrypoint。
+- 验收：Fabric PASS(117s)/Forge PASS(45s)，datagen 类进 jar；Gradle 任务存在性实测；开关关闭时零残留（单测）。
+- 未做：实际运行 datagen（运行时行为未验证）；评估与三选项见 docs/datagen-evaluation.md。
+
 ## S9 交付物（实体，已完成）
 
 - Spec 新增 `content.entities[]`：kind/category、生命/速度/攻击/索敌、体积与阴影、复用模型、掉落表。

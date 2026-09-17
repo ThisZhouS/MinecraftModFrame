@@ -217,6 +217,8 @@ export const ModSpec = z.object({
   }).strict(),
   content: ContentSpec.default({ items: [], blocks: [], recipes: [], advancements: [], entities: [] }),
   ui: UiSpec.default({ screens: [] }),
+  /** Emit a runnable data-generation entry point (opt-in; see docs/datagen-evaluation.md option B). */
+  datagen: z.boolean().default(false),
 }).strict();
 
 export type ScreenSpecT = z.infer<typeof ScreenSpec>;

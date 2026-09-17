@@ -103,6 +103,9 @@ export const ADVANCEMENT_TEMPLATE_KEYS = ["advancement", "advancementItemPredica
 /** Language keys the advancement generator needs. */
 export const ADVANCEMENT_LANG_KEYS = ["advancementTitle", "advancementDescription"] as const;
 
+/** Template keys the opt-in data-generation slice needs (spec.datagen = true). */
+export const DATAGEN_TEMPLATE_KEYS = ["dataGenClass", "dataGenProvider", "dataGenRunConfig"] as const;
+
 /** Template keys the entity generator needs (all-or-nothing, like the UI set). */
 export const ENTITY_TEMPLATE_KEYS = [
   "entityClass",
@@ -138,6 +141,8 @@ export const AdapterRecord = z.object({
   clientSubpackage: z.string().default("client"),
   /** Sub-package holding common (server+client) content classes such as entity types. */
   entitySubpackage: z.string().default("entity"),
+  /** Sub-package holding data-generation entry points and example providers. */
+  datagenSubpackage: z.string().default("datagen"),
   /**
    * Vanilla models a generated entity renderer may reuse: spec key -> the model class and its
    * ModelLayer constant. Lives here because both names change across versions.
@@ -238,6 +243,9 @@ const REQUIRED_PLACEHOLDERS: Record<string, string[]> = {
   entityRendererClass: ["{{ENTITY_CLASS}}", "{{MODEL_CLASS}}", "{{MODEL_LAYER}}", "{{ENTITY_ID}}"],
   entityRendererRegistration: ["{{ENTITY_CONST}}", "{{RENDERER_FQ}}"],
   entityLootTable: ["{{LOOT_POOLS_JSON}}"],
+  dataGenClass: ["{{DATAGEN_PROVIDER_CLASS}}"],
+  dataGenProvider: ["{{DATAGEN_PROVIDER_CLASS}}", "{{modId}}", "{{namespace}}"],
+  dataGenRunConfig: [],
 };
 
 /** Static sanity checks beyond the schema: referenced template keys must exist and stay wired up. */
@@ -311,6 +319,15 @@ export function lintAdapter(a: AdapterRecordT): string[] {
     }
     if (!(a.templates.clientBootstrap ?? "").includes("{{ENTITY_RENDERER_REGISTRATIONS}}")) {
       problems.push("adapter declares entity support but clientBootstrap has no {{ENTITY_RENDERER_REGISTRATIONS}} injection point");
+    }
+  }
+  // Data generation is opt-in per spec, so an adapter either supports it fully or not at all.
+  const datagenTemplates = DATAGEN_TEMPLATE_KEYS.filter((k) => k in a.templates);
+  if (datagenTemplates.length > 0) {
+    const missing = DATAGEN_TEMPLATE_KEYS.filter((k) => !(k in a.templates));
+    if (missing.length > 0) problems.push(`adapter declares datagen support but is missing template(s): ${missing.join(", ")}`);
+    if (!(a.templates.buildGradle ?? "").includes("{{DATAGEN_RUN_CONFIG}}")) {
+      problems.push("adapter declares datagen support but buildGradle has no {{DATAGEN_RUN_CONFIG}} injection point");
     }
   }
   // Advancements: same reasoning (advancements/ on 1.20.1, advancement/ on 1.21+).

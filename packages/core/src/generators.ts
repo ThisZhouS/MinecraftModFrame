@@ -48,10 +48,15 @@ export function buildVars(spec: ModSpecT, adapter: AdapterRecordT): Record<strin
   const packageName = renderTemplate(adapter.basePackagePattern, { modId, namespace: ns }, "basePackagePattern");
   const clientPackageName = `${packageName}.${adapter.clientSubpackage}`;
   const entityPackageName = `${packageName}.${adapter.entitySubpackage}`;
+  const datagenPackageName = `${packageName}.${adapter.datagenSubpackage}`;
   // A client bootstrap is needed for key-bound screens and for entity renderers alike.
   const hasKeybinds =
     spec.ui.screens.some((s) => s.key !== undefined) || spec.content.entities.length > 0;
   const clientEntrypoint = hasKeybinds ? `${clientPackageName}.${adapter.mainClassSimpleName}Client` : "";
+  // Fabric wires its data generator through a mod-metadata entrypoint; the other loaders scan annotations.
+  const datagenEntrypoint = spec.datagen
+    ? `${packageName}.${adapter.datagenSubpackage}.${adapter.mainClassSimpleName}DataGen`
+    : "";
   return {
     modId,
     namespace: ns,
@@ -74,9 +79,13 @@ export function buildVars(spec: ModSpecT, adapter: AdapterRecordT): Record<strin
     clientPackagePath: clientPackageName.split(".").join("/"),
     entityPackageName,
     entityPackagePath: entityPackageName.split(".").join("/"),
+    datagenPackageName,
+    datagenPackagePath: datagenPackageName.split(".").join("/"),
     clientEntrypoint,
     /** Quoted form for JSON templates; empty string keeps the JSON array valid. */
     clientEntrypointJson: clientEntrypoint === "" ? "" : JSON.stringify(clientEntrypoint),
+    datagenEntrypoint,
+    datagenEntrypointJson: datagenEntrypoint === "" ? "" : JSON.stringify(datagenEntrypoint),
     mainClassSimpleName: adapter.mainClassSimpleName,
     mainClassFq: `${packageName}.${adapter.mainClassSimpleName}`,
     ...gradleVars,
@@ -643,6 +652,46 @@ function genEntities(ctx: GenContext, javaDir: string): EntityGenOut {
   out.registryInitCalls.push(renderTemplate(a.templates.entitiesRegistryInit!, registryVars, "entitiesRegistryInit"));
   return out;
 }
+interface DataGenOut {
+  files: FileEntry[];
+  /** build.gradle wiring for the data run (empty when the spec does not ask for datagen). */
+  runConfig: string;
+}
+
+/**
+ * Opt-in data generation (spec.datagen). Option B of docs/datagen-evaluation.md: emit the loader's
+ * data-run entry point plus one example provider and the Gradle wiring, and leave the providers for
+ * real content to the caller. Generated content keeps flowing through the JSON path, which is verified
+ * against vanilla datapack files and therefore needs no data run.
+ */
+function genDataGen(ctx: GenContext, javaDir: string): DataGenOut {
+  const out: DataGenOut = { files: [], runConfig: "" };
+  if (!ctx.spec.datagen) return out;
+  const a = ctx.adapter;
+  if (a.templates.dataGenClass === undefined || a.templates.dataGenProvider === undefined || a.templates.dataGenRunConfig === undefined) {
+    throw new McmodError("ADAPTER_INVALID", `Adapter ${a.id} does not support datagen: set "datagen": false or pick an adapter that ships data-generation templates`, { adapterId: a.id });
+  }
+  const datagenDir = `${javaDir}${a.datagenSubpackage}/`;
+  const vars: Record<string, string> = {
+    ...ctx.vars,
+    DATAGEN_CLASS: `${a.mainClassSimpleName}DataGen`,
+    DATAGEN_PROVIDER_CLASS: `${a.mainClassSimpleName}ExampleProvider`,
+  };
+  out.files.push(
+    {
+      path: `${datagenDir}${vars.DATAGEN_CLASS}.java`,
+      content: renderTemplate(a.templates.dataGenClass, vars, "dataGenClass"),
+      managed: true, executable: false, reason: "datagen:entry",
+    },
+    {
+      path: `${datagenDir}${vars.DATAGEN_PROVIDER_CLASS}.java`,
+      content: renderTemplate(a.templates.dataGenProvider, vars, "dataGenProvider"),
+      managed: true, executable: false, reason: "datagen:provider",
+    },
+  );
+  out.runConfig = renderTemplate(a.templates.dataGenRunConfig, vars, "dataGenRunConfig");
+  return out;
+}
 export interface PlanOptions {
   /**
    * Resolve an adapter asset key to an absolute file path. Required when the adapter declares
@@ -678,7 +727,11 @@ export function planGeneration(spec: ModSpecT, adapter: AdapterRecordT, options:
   // Entities are generated first: the skeleton (registry init) and the client bootstrap (renderers)
   // both consume injection points that only they can fill.
   const entities = genEntities(ctx, javaDir);
-  const injectionVars: Record<string, string> = { REGISTRY_INIT_CALLS: entities.registryInitCalls.join("\n") };
+  const datagen = genDataGen(ctx, javaDir);
+  const injectionVars: Record<string, string> = {
+    REGISTRY_INIT_CALLS: entities.registryInitCalls.join("\n"),
+    DATAGEN_RUN_CONFIG: datagen.runConfig,
+  };
 
   for (const f of adapter.projectFiles) {
     files.push({
@@ -732,7 +785,7 @@ export function planGeneration(spec: ModSpecT, adapter: AdapterRecordT, options:
   const recipes = genRecipes(ctx);
   // Advancements consume recipe ids so they can reference "the recipe this unlocks" and derive an icon.
   const advancements = genAdvancements(ctx, recipes.results);
-  files.push(...ui.files, ...recipes.files, ...advancements.files, ...entities.files);
+  files.push(...ui.files, ...recipes.files, ...advancements.files, ...entities.files, ...datagen.files);
 
   const langObj: Record<string, string> = {
     [renderTemplate(adapter.langKeys.itemGroup, { namespace: ctx.vars.namespace! }, "langKeys.itemGroup")]: ctx.vars.modName!,

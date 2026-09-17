@@ -184,6 +184,38 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
     }
   });
 
+  it("emits a data-generation entry point and Gradle wiring when the spec opts in", () => {
+    for (const a of listAdapters()) {
+      const p = a.id === adapter.id ? plan : planProject(spec, a);
+      const paths = p.files.map((f) => f.path);
+      expect(paths, a.id + " datagen entry").toContain("src/main/java/com/examplemod/datagen/ModMainDataGen.java");
+      expect(paths, a.id + " example provider").toContain("src/main/java/com/examplemod/datagen/ModMainExampleProvider.java");
+      const build = p.files.find((f) => f.path === "build.gradle")!.content;
+      expect(build, a.id + " data run task").toMatch(a.loader === "fabric" ? /runDatagen/ : /runData/);
+      expect(build, a.id + " generated resources dir").toMatch(/generated/);
+      const provider = p.files.find((f) => f.path.endsWith("ModMainExampleProvider.java"))!.content;
+      expect(provider).toContain("DataProvider.saveStable");
+      expect(provider).not.toContain("{{");
+      if (a.loader === "fabric") {
+        const meta = JSON.parse(p.files.find((f) => f.path.endsWith("fabric.mod.json"))!.content);
+        expect(meta.entrypoints["fabric-datagen"]).toEqual(["com.examplemod.datagen.ModMainDataGen"]);
+      }
+    }
+  });
+
+  it("emits no data-generation wiring when the spec leaves datagen off", () => {
+    const off = { ...spec, datagen: false };
+    for (const a of listAdapters()) {
+      const p = planProject(off as typeof spec, a);
+      expect(p.files.some((f) => f.path.includes("/datagen/")), a.id + " should not emit datagen classes").toBe(false);
+      const build = p.files.find((f) => f.path === "build.gradle")!.content;
+      expect(build, a.id + " should not wire a data run").not.toMatch(/runDatagen|runData/);
+      // Fabric tolerates an empty entrypoint list (same as the client entrypoint), so accept either form.
+      const meta = p.files.find((f) => f.path.endsWith("fabric.mod.json"));
+      if (meta) expect(JSON.parse(meta.content).entrypoints["fabric-datagen"] ?? []).toEqual([]);
+    }
+  });
+
   it("every adapter declares the build facts the generator relies on", () => {
     for (const a of listAdapters()) {
       expect(a.java).toBeGreaterThanOrEqual(8);

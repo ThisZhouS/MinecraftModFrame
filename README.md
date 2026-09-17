@@ -125,6 +125,21 @@ out/my-mod/
 
 **未生成**：AI 目标（`registerGoals`）、生成蛋、贴图与自定义模型（渲染器默认复用原版模型，贴图需自备 `assets/<ns>/textures/entity/<id>.png`）。
 
+## datagen（可选，默认关闭）
+
+```jsonc
+{ "datagen": true }
+```
+
+打开后额外生成**加载器对应的数据生成入口**（Fabric：`DataGeneratorEntrypoint` + `fabric.mod.json` 的 `fabric-datagen` entrypoint；Forge/NeoForge：`GatherDataEvent` 订阅类）、一个最小示例 provider（演示 `DataProvider.saveStable`），以及构建脚本里的数据任务接线：
+
+```bash
+./gradlew runDatagen     # Fabric，输出到 src/main/generated
+./gradlew runData        # Forge / NeoForge，输出到 src/generated/resources
+```
+
+设计取舍见 `docs/datagen-evaluation.md`：本框架生成的内容仍走 JSON 路径（已用 jar 内原版数据逐字段校验），datagen 只提供「你自己写 Java provider」所需的入口与接线，避免两条路径重复维护。默认关闭时工程与之前完全一致。
+
 ## 接给智能体 / Wiring an agent
 
 ### MCP（stdio，推荐）

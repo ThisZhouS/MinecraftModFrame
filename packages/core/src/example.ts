@@ -20,6 +20,8 @@ export function exampleSpec(): ModSpecT {
       license: "MIT",
     },
     target: { mcVersion: "1.21.1", loader: "fabric" },
+    // Opt-in: emit the loader's data-run entry point plus an example provider (docs/datagen-evaluation.md).
+    datagen: true,
     content: {
       items: [
         { id: "ruby", name: "Ruby", group: "ingredients" },
