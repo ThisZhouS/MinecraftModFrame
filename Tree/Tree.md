@@ -2,7 +2,7 @@
 
 更新时间: 2026-09-21
 
-排除目录: .clude, .codex, .git, .gradle, .next, Temp, __pycache__, build, coverage, dist, node_modules, tmp
+排除目录: .clude, .codex, .git, .gradle, .next, Temp, __pycache__, build, coverage, dist, node_modules, out, tmp
 
 ```text
 MCMOD/
@@ -21,40 +21,6 @@ MCMOD/
 |   `-- tasks.md
 |-- examples
 |   `-- mk2-fishing-rod-forge-1.20.1.json
-|-- out
-|   `-- mk2
-|       |-- gradle
-|       |   `-- wrapper
-|       |       |-- gradle-wrapper.jar
-|       |       `-- gradle-wrapper.properties
-|       |-- src
-|       |   `-- main
-|       |       |-- java
-|       |       |   `-- com
-|       |       |       `-- mk2
-|       |       |           |-- ModMain.java
-|       |       |           |-- ModMainBlocks.java
-|       |       |           `-- ModMainItems.java
-|       |       `-- resources
-|       |           |-- assets
-|       |           |   `-- mk2
-|       |           |       |-- lang
-|       |           |       |   `-- en_us.json
-|       |           |       |-- models
-|       |           |       |   `-- item
-|       |           |       |       `-- mk2.json
-|       |           |       `-- textures
-|       |           |           `-- item
-|       |           |               `-- mk2.png
-|       |           |-- META-INF
-|       |           |   `-- mods.toml
-|       |           `-- pack.mcmeta
-|       |-- build.gradle
-|       |-- gradle.properties
-|       |-- gradlew
-|       |-- gradlew.bat
-|       |-- README.md
-|       `-- settings.gradle
 |-- packages
 |   |-- adapters
 |   |   |-- assets
@@ -142,6 +108,7 @@ MCMOD/
 |-- Tree
 |   |-- docs.md
 |   |-- docs__research.md
+|   |-- examples.md
 |   |-- packages.md
 |   |-- packages__adapters.md
 |   |-- packages__adapters__assets.md

@@ -22,6 +22,8 @@ EXCLUDED = {
     ".gradle",
     "coverage",
     "tmp",
+    # Generated mod projects (gitignored): regenerate from a spec, never hand-edited.
+    "out",
     # Temporary workspace (gitignored): acceptance artifacts and one-off scripts.
     "Temp",
 }
