@@ -48,6 +48,8 @@ export async function emitPlan(plan: GenerationPlan, opts: EmitOptions): Promise
     await mkdir(dirname(target), { recursive: true });
     if (f.copyFrom !== undefined) {
       await copyFile(f.copyFrom, target);
+    } else if (f.bytes !== undefined) {
+      await writeFile(target, f.bytes);
     } else {
       await writeFile(target, f.content, "utf8");
     }

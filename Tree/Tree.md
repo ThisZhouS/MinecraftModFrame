@@ -1,6 +1,6 @@
 # 项目目录树
 
-更新时间: 2026-09-17
+更新时间: 2026-09-21
 
 排除目录: .clude, .codex, .git, .gradle, .next, Temp, __pycache__, build, coverage, dist, node_modules, tmp
 
@@ -72,11 +72,14 @@ MCMOD/
 |   |   |   |-- generators.ts
 |   |   |   |-- ids.ts
 |   |   |   |-- index.ts
+|   |   |   |-- png.ts
 |   |   |   |-- render.ts
-|   |   |   `-- spec.ts
+|   |   |   |-- spec.ts
+|   |   |   `-- texture.ts
 |   |   |-- test
 |   |   |   |-- fixture-adapter.ts
 |   |   |   |-- pipeline.test.ts
+|   |   |   |-- texture.test.ts
 |   |   |   `-- unit.test.ts
 |   |   |-- package.json
 |   |   `-- tsconfig.json
@@ -94,6 +97,35 @@ MCMOD/
 |   |-- update_tree.py
 |   `-- verify-build.mjs
 |-- Tree
+|   |-- docs.md
+|   |-- docs__research.md
+|   |-- packages.md
+|   |-- packages__adapters.md
+|   |-- packages__adapters__assets.md
+|   |-- packages__adapters__assets__gradle-8.8.md
+|   |-- packages__adapters__assets__gradle-8.8__gradle.md
+|   |-- packages__adapters__assets__gradle-8.8__gradle__wrapper.md
+|   |-- packages__adapters__assets__gradle-9.5.1.md
+|   |-- packages__adapters__assets__gradle-9.5.1__gradle.md
+|   |-- packages__adapters__assets__gradle-9.5.1__gradle__wrapper.md
+|   |-- packages__adapters__data.md
+|   |-- packages__adapters__src.md
+|   |-- packages__adapters__test.md
+|   |-- packages__api.md
+|   |-- packages__api__src.md
+|   |-- packages__api__test.md
+|   |-- packages__cli.md
+|   |-- packages__cli__src.md
+|   |-- packages__cli__test.md
+|   |-- packages__core.md
+|   |-- packages__core__src.md
+|   |-- packages__core__test.md
+|   |-- packages__mcp-server.md
+|   |-- packages__mcp-server__src.md
+|   |-- packages__mcp-server__test.md
+|   |-- Prompt.md
+|   |-- scripts.md
+|   `-- Tree.md
 |-- package.json
 |-- pnpm-lock.yaml
 |-- pnpm-workspace.yaml

@@ -182,6 +182,24 @@ Spec 里一段声明：
 | **明确未做** | **没有运行 datagen**（`runDatagen`/`runData` 未执行）——运行时行为未验证；这是本轮唯一的「编译/任务存在 ≠ 运行成功」缺口 |
 
 评估与三选项（A 不做 / B 最小接线 / C 完整 provider）见 `docs/datagen-evaluation.md`；本轮落地的是可逆的 B。
+## 9b. 贴图生成 / 生图（本轮新增）
+
+开关式能力：Spec 顶层 `"textures": true` 时为每个物品/方块生成 16×16 PNG、为每个实体生成 64×32 贴图；单个内容可用 `texture: { style, palette, seed }` 覆盖。默认关闭（生成的 PNG 是受管文件，会覆盖手工美术）。
+
+| 项 | 证据 |
+| --- | --- |
+| 真编译 | Fabric **PASS**（`gradle build` 退出码 0，产出 `examplemod-1.0.0.jar`） |
+| 进 jar | jar 内 `assets/examplemod/textures/{item,block,entity}/*.png` 5 个文件齐全 |
+| 字节一致性 | 从 jar 解出的 5 个 PNG 与生成源**逐字节相同**（sha256 前 12 位逐一比对：`209175298c23` / `8133c9082c7c` / `91779052d2c8` / `b97c35ecbcb1` / `09a92a170255`） |
+| PNG 结构 | 5/5 通过**签名 + IHDR 尺寸 + CRC32 + IDAT inflate 长度**校验（16×16 raw=1040/1040；64×32 raw=8224/8224；crcBad=0） |
+| 引用链路 | 模型/渲染器引用与落盘路径实测对应：`layer0: examplemod:item/ruby` → `textures/item/ruby.png`；`all: examplemod:block/ruby_ore` → `textures/block/ruby_ore.png`；渲染器 `textures/entity/ruby_golem.png` → 同名文件 |
+| 确定性 | 同 Spec 重生成**逐字节一致**（`diff -r` 全等）——seeded mulberry32，无 `Math.random` |
+| 开关关闭时零残留 | `textures:false` ⇒ 45 → 40 个文件，差集恰为 5 个 PNG |
+| 测试 | core 38 项通过（含 PNG 往返编解码、确定性、配色、开关、非法风格字段级报错） |
+| **明确未做** | **贴图在游戏内的实际观感未验证**（无客户端运行）；实体贴图为 64×32 **纯色占位**，自定义 UV 美术仍需自备；未接真实图像模型（`paintTexture` 是预留的单一替换点） |
+
+设计取舍：贴图走**参数化程序化绘制**而非调用图像模型——离线、瞬时、**可复现**。可复现是关键：改图会体现为 diff，而不是不可复现的噪声；接真实模型只需替换 `paintTexture` 一个函数。
+
 ## 10. 本轮交付的其他能力
 
 - Spec 新增 `ui.screens[]`（id/title/key/width/height/lines），缺省值可省略；非法键给出字段级报错。

@@ -1,6 +1,7 @@
 import { McmodError } from "./errors.js";
 import { toPascalCase, toDisplayName, toScreamingSnake } from "./ids.js";
 import { renderTemplate, renderPath } from "./render.js";
+import { paintTexturePng, paintEntitySheetPng } from "./texture.js";
 import type { AdapterRecordT } from "./adapter-contract.js";
 import { namespaceOf } from "./spec.js";
 import type { ModSpecT } from "./spec.js";
@@ -13,6 +14,7 @@ import type { ModSpecT } from "./spec.js";
 export interface FileEntry {
   /** Relative posix path inside the generated project directory. */
   path: string;
+  /** UTF-8 body; empty string for binary entries (see `bytes`). */
   content: string;
   managed: boolean;
   executable: boolean;
@@ -20,6 +22,8 @@ export interface FileEntry {
   reason: string;
   /** When set, the file is copied from this absolute source path (binary assets: wrapper jar). */
   copyFrom?: string;
+  /** In-memory binary body (generated PNG textures). Takes precedence over `content`. */
+  bytes?: Uint8Array;
 }
 
 export interface GenerationPlan {
@@ -692,6 +696,92 @@ function genDataGen(ctx: GenContext, javaDir: string): DataGenOut {
   out.runConfig = renderTemplate(a.templates.dataGenRunConfig, vars, "dataGenRunConfig");
   return out;
 }
+interface TextureGenOut {
+  files: FileEntry[];
+}
+
+/**
+ * Texture generator (opt-in via spec.textures).
+ *
+ * Everything that decides how a texture looks — style, palette, seed — is spec data, so an agent
+ * tunes art exactly the way it tunes behaviour, and one spec always paints byte-identical PNGs.
+ * That reproducibility is what makes the output reviewable: a changed texture shows up as a diff.
+ */
+function genTextures(ctx: GenContext): TextureGenOut {
+  const out: TextureGenOut = { files: [] };
+  if (!ctx.spec.textures) return out;
+  const a = ctx.adapter;
+  const paths = a.contentPaths;
+  if (paths.itemTexture === undefined || paths.blockTexture === undefined) {
+    throw new McmodError(
+      "ADAPTER_INVALID",
+      `Adapter ${a.id} does not support spec.textures: it declares no contentPaths.itemTexture/blockTexture. Set "textures": false or use an adapter that ships texture paths.`,
+      { adapterId: a.id },
+    );
+  }
+  const push = (pathPattern: string, id: string, bytes: Uint8Array, reason: string): void => {
+    out.files.push({
+      path: renderPath(pathPattern, { ...ctx.vars, id }, reason),
+      content: "",
+      bytes,
+      managed: true,
+      executable: false,
+      reason,
+    });
+  };
+
+  for (const item of ctx.spec.content.items) {
+    push(
+      paths.itemTexture,
+      item.id,
+      paintTexturePng({
+        id: item.id,
+        // Items default to a flecked gem/metal look; blocks to a rougher material look.
+        style: item.texture?.style ?? "speckle",
+        palette: item.texture?.palette,
+        seed: item.texture?.seed,
+      }),
+      `texture:item:${item.id}`,
+    );
+  }
+  for (const block of ctx.spec.content.blocks) {
+    push(
+      paths.blockTexture,
+      block.id,
+      paintTexturePng({
+        id: block.id,
+        style: block.texture?.style ?? "noise",
+        palette: block.texture?.palette,
+        seed: block.texture?.seed,
+      }),
+      `texture:block:${block.id}`,
+    );
+  }
+  if (ctx.spec.content.entities.length > 0) {
+    if (paths.entityTexture === undefined) {
+      throw new McmodError(
+        "ADAPTER_INVALID",
+        `Adapter ${a.id} does not support textures for entities: it declares no contentPaths.entityTexture`,
+        { adapterId: a.id },
+      );
+    }
+    for (const entity of ctx.spec.content.entities) {
+      push(
+        paths.entityTexture,
+        entity.id,
+        paintEntitySheetPng({
+          id: entity.id,
+          style: entity.texture?.style ?? "noise",
+          palette: entity.texture?.palette,
+          seed: entity.texture?.seed,
+        }),
+        `texture:entity:${entity.id}`,
+      );
+    }
+  }
+  return out;
+}
+
 export interface PlanOptions {
   /**
    * Resolve an adapter asset key to an absolute file path. Required when the adapter declares
@@ -785,7 +875,8 @@ export function planGeneration(spec: ModSpecT, adapter: AdapterRecordT, options:
   const recipes = genRecipes(ctx);
   // Advancements consume recipe ids so they can reference "the recipe this unlocks" and derive an icon.
   const advancements = genAdvancements(ctx, recipes.results);
-  files.push(...ui.files, ...recipes.files, ...advancements.files, ...entities.files, ...datagen.files);
+  const textures = genTextures(ctx);
+  files.push(...ui.files, ...recipes.files, ...advancements.files, ...entities.files, ...datagen.files, ...textures.files);
 
   const langObj: Record<string, string> = {
     [renderTemplate(adapter.langKeys.itemGroup, { namespace: ctx.vars.namespace! }, "langKeys.itemGroup")]: ctx.vars.modName!,

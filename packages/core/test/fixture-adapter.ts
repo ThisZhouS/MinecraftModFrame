@@ -79,6 +79,9 @@ export function makeFixtureAdapter(): AdapterRecordT {
       lang: "src/main/resources/assets/{{namespace}}/lang/en_us.json",
       recipe: "src/main/resources/data/{{namespace}}/recipe/{{id}}.json",
       advancement: "src/main/resources/data/{{namespace}}/advancement/{{id}}.json",
+      itemTexture: "src/main/resources/assets/{{namespace}}/textures/item/{{id}}.png",
+      blockTexture: "src/main/resources/assets/{{namespace}}/textures/block/{{id}}.png",
+      entityTexture: "src/main/resources/assets/{{namespace}}/textures/entity/{{id}}.png",
     },
     langKeys: {
       item: "item.{{namespace}}.{{id}}",

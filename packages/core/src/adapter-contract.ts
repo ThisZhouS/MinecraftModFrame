@@ -37,6 +37,13 @@ export const ContentPathsSpec = z.object({
   advancement: z.string().optional(),
   /** Optional: required only by adapters that support content.entities. */
   entityLootTable: z.string().optional(),
+  /**
+   * Optional: required only by adapters that support spec.textures. The texture directory moved
+   * across versions (textures/item vs textures/items on some forks), so it stays adapter data.
+   */
+  itemTexture: z.string().optional(),
+  blockTexture: z.string().optional(),
+  entityTexture: z.string().optional(),
 });
 
 export const LangKeysSpec = z.object({
@@ -337,6 +344,23 @@ export function lintAdapter(a: AdapterRecordT): string[] {
     else if (!path.includes("{{id}}")) problems.push("contentPaths.advancement must contain {{id}}");
     const missingLang = ADVANCEMENT_LANG_KEYS.filter((k) => a.langKeys[k] === undefined);
     if (missingLang.length > 0) problems.push(`adapter declares advancement support but is missing langKeys: ${missingLang.join(", ")}`);
+  }
+  // Textures are opt-in per spec, so an adapter either ships the whole path set or none of it:
+  // a partial set would emit a plan that fails halfway through with a confusing error.
+  const texturePaths = (["itemTexture", "blockTexture", "entityTexture"] as const).filter(
+    (k) => a.contentPaths[k] !== undefined,
+  );
+  if (texturePaths.length > 0 && texturePaths.length < 3) {
+    const missing = (["itemTexture", "blockTexture", "entityTexture"] as const).filter(
+      (k) => a.contentPaths[k] === undefined,
+    );
+    problems.push(`adapter declares some texture paths but is missing contentPaths: ${missing.join(", ")}`);
+  }
+  for (const key of texturePaths) {
+    const p = a.contentPaths[key]!;
+    if (!p.includes("{{id}}")) problems.push(`contentPaths.${key} must contain {{id}} or every texture overwrites the same file`);
+    if (!p.includes("{{namespace}}")) problems.push(`contentPaths.${key} must contain {{namespace}}`);
+    if (!p.endsWith(".png")) problems.push(`contentPaths.${key} must end in .png`);
   }
   for (const [key, wanted] of Object.entries(REQUIRED_PLACEHOLDERS)) {
     const body = a.templates[key];

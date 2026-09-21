@@ -67,7 +67,30 @@ out/my-mod/
         └── data/<ns>/loot_table/…, data/minecraft/tags/block/…   # 1.21+ 单数目录
 ```
 
-贴图（16×16 PNG）不生成，生成工程的 README 会明确列出需要自备的文件。
+## 贴图生成（生图，可选，默认关闭）
+
+```jsonc
+{
+  "textures": true,                       // 开关；打开后为每个物品/方块/实体生成 PNG
+  "content": {
+    "items": [
+      { "id": "ruby", "texture": { "style": "speckle", "palette": ["#b91c1c", "#7f1d1d", "#f87171"] } },
+      { "id": "charged_ruby", "texture": { "style": "gradient", "palette": ["#b91c1c", "#fbbf24"] } }
+    ],
+    "blocks": [
+      { "id": "ruby_ore", "texture": { "style": "ore", "palette": ["#6b7280", "#dc2626"] } }
+    ]
+  }
+}
+```
+
+- 风格：`solid` / `noise` / `speckle` / `ore` / `gradient` / `border` / `planks`；**物品默认 `speckle`，方块默认 `noise`**。
+- 省略 `palette` 时由内容 id 哈希出稳定色相（同名同色，永不漂移）；`seed` 可在不换配色的前提下重掷图案。
+- 产物路径与模型引用**严格对应**：`layer0: <ns>:item/<id>` → `assets/<ns>/textures/item/<id>.png`；方块 `all: <ns>:block/<id>` → `textures/block/<id>.png`；实体渲染器的 `textures/entity/<id>.png` 生成为 **64×32**（原版猪/牛/鸡/羊的 UV 版式），否则每个 UV 都会采样错像素。
+- **确定性**：同一份 Spec 永远产出逐字节相同的 PNG（seeded mulberry32，无 `Math.random`），所以改图会体现为 diff，而不是不可复现的噪声。
+- 实现是**参数化程序化绘制**（`packages/core/src/texture.ts` + 零依赖 PNG 编码器 `png.ts`，仅用 `node:zlib`），离线、瞬时、可复现。要接真实图像模型，只需替换 `paintTexture`，Spec 字段与落盘链路不变。
+- 默认关闭的原因：生成的 PNG 是**受管文件**，重生成会覆盖——手工美术不会被误伤。关闭时工程与之前完全一致（实测 45 → 40 个文件，差集恰为 5 个 PNG）。
+- 实体的 64×32 图是**纯色占位**（渲染成单色生物），自定义 UV 美术仍需自备；这是刻意取舍，见下。
 
 ## UI 生成：一份 Spec 描述游戏内界面
 
@@ -207,9 +230,9 @@ MCMODKIT_API_PORT=7431 node packages/api/dist/index.js   # 仅监听 loopback
 
 ## 状态与边界
 
-- 当前切片：物品 + 方块生成（Java 注册、模型、语言、掉落表、可挖掘标签、创造模式标签）+ 完整工程骨架；**Fabric 1.21.1 与 Forge 1.20.1 均已通过真实编译验证**（NeoForge 1.21.1 因本机无法访问 maven.neoforged.net 而未编译验证）。
+- 当前切片：物品 + 方块 + 配方 + 进度 + 实体 + UI(Screen) + datagen + **贴图生成**；**Fabric 1.21.1 与 Forge 1.20.1 均已通过真实编译验证**（NeoForge 1.21.1 因本机无法访问 maven.neoforged.net 而未编译验证）。
 - 一键复验：`node scripts/verify-build.mjs --adapter forge-1.20.1 --gradle "8=<gradle-8.8>/bin/gradle.bat" --java-home-17 <jdk17>`（详情见 `docs/acceptance-report.md` §8）。
-- 尚未实现：配方/进度/实体/附魔/UI(Screen)/datagen 生成、跨版本升级工作流、贴图生成。
+- 尚未实现：附魔/药水/盔甲/工具生成、跨版本升级工作流、自定义实体模型与 UV 贴图（当前实体贴图是 64×32 纯色占位）、真实图像模型接入（`paintTexture` 已是可替换的单一入口）。
 - 本机仅 JDK 21 ⇒ 只有 Java 21 目标可本机编译验证；其他版本目标会被明确标注为「仅生成、受限验证」，绝不谎称已验证。
 
 ## 许可证

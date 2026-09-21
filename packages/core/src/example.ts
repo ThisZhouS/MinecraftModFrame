@@ -22,14 +22,19 @@ export function exampleSpec(): ModSpecT {
     target: { mcVersion: "1.21.1", loader: "fabric" },
     // Opt-in: emit the loader's data-run entry point plus an example provider (docs/datagen-evaluation.md).
     datagen: true,
+    // Opt-in: paint a 16x16 PNG for every item/block and a 64x32 sheet per entity. Off by default so
+    // hand-made art is never overwritten; every texture is deterministic, so art changes show up in diffs.
+    textures: true,
     content: {
       items: [
-        { id: "ruby", name: "Ruby", group: "ingredients" },
-        { id: "charged_ruby", maxCount: 16 },
+        // An explicit palette + style replaces the derived look; drop `texture` to get a stable
+        // hash-derived colour, and change `seed` to re-roll the pattern without touching the palette.
+        { id: "ruby", name: "Ruby", group: "ingredients", texture: { style: "speckle", palette: ["#b91c1c", "#7f1d1d", "#f87171"] } },
+        { id: "charged_ruby", maxCount: 16, texture: { style: "gradient", palette: ["#b91c1c", "#fbbf24"] } },
       ],
       blocks: [
-        { id: "ruby_ore", hardness: 3.0, resistance: 9.0, tool: "pickaxe" },
-        { id: "deepslate_ruby_ore", hardness: 4.5, resistance: 12.0, tool: "pickaxe" },
+        { id: "ruby_ore", hardness: 3.0, resistance: 9.0, tool: "pickaxe", texture: { style: "ore", palette: ["#6b7280", "#dc2626"] } },
+        { id: "deepslate_ruby_ore", hardness: 4.5, resistance: 12.0, tool: "pickaxe", texture: { style: "ore", palette: ["#374151", "#dc2626"] } },
       ],
       recipes: [
         // 2x2 of rubies -> one charged ruby

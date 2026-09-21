@@ -25,6 +25,15 @@
 - `packages/api`：`node:http` JSON API（`/api/versions`、`/api/validate`、`/api/generate` 等）。
 - 测试分布：core 14、adapters 10、cli 4、mcp-server 6、api 6。
 
+## S11 交付物（贴图生成 / 生图，已完成）
+
+- Spec 新增 `textures`（默认 false，受管文件不可默认覆盖手工美术）与物品/方块/实体级 `texture: { style, palette, seed }`。
+- `packages/core/src/png.ts`：零依赖 PNG 编码器（`node:zlib` deflate + 自实现 CRC32，IHDR/IDAT/IEND）。
+- `packages/core/src/texture.ts`：7 种风格（solid/noise/speckle/ore/gradient/border/planks）+ seeded mulberry32，**同 Spec 逐字节可复现**；省略 palette 时由 id 哈希出色相。
+- 引擎 `genTextures`：物品/方块 16×16、实体 64×32（原版猪/牛/鸡/羊 UV 版式）；`FileEntry.bytes` 支持二进制落盘；三适配器各加 3 条 `contentPaths.*Texture` + lint「全有或全无」。
+- 验收：45 文件（关闭时 40，差集恰为 5 个 PNG）；5 个 PNG 全部通过**签名 + IHDR + CRC + IDAT inflate 长度**校验；重生成 byte-identical；模型引用链路实测对应（`item/ruby`、`block/ruby_ore`、`textures/entity/ruby_golem.png`）；core 38 项测试通过。
+- 未做：自定义 UV 实体贴图（当前为纯色占位）、真实图像模型接入、贴图在游戏内的实际观感验证。
+
 ## S10 交付物（datagen 方案 B，已完成）
 
 - Spec 开关 `datagen`（默认 false）；三适配器各新增 3 个模板（dataGenClass / dataGenProvider / dataGenRunConfig）。

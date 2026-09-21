@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TEXTURE_STYLES } from "./texture.js";
 
 /** Regexes are part of the public contract (adapters/CLI/MCP reuse them for early checks). */
 export const MOD_ID_RE = /^[a-z][a-z0-9_-]{1,63}$/;
@@ -13,6 +14,22 @@ export type LoaderKind = z.infer<typeof LoaderKind>;
 const idField = (what: string) =>
   z.string().regex(ENTRY_ID_RE, `${what} id must be snake_case (lowercase letters/digits/underscore, start with a letter)`);
 
+/**
+ * How a generated 16x16 texture should look. Kept as data (not a prompt string) so the same spec
+ * always paints the same pixels and an agent can adjust art by editing numbers, not by re-rolling.
+ */
+export const TextureSpec = z.object({
+  /** "#rrggbb" colours, base first. Absent = a stable hue derived from the content id. */
+  palette: z
+    .array(z.string().regex(/^#[0-9a-fA-F]{6}$/, 'palette entries must look like "#8a2be2"'))
+    .min(1)
+    .max(8)
+    .optional(),
+  style: z.enum(TEXTURE_STYLES).default("speckle"),
+  /** Override the derived RNG seed to get a different pattern for the same id. */
+  seed: z.number().int().min(0).max(4294967295).optional(),
+}).strict();
+
 export const ItemSpec = z.object({
   id: idField("item"),
   /** Display name; default derived from id ("ruby_ore" -> "Ruby Ore"). */
@@ -20,6 +37,8 @@ export const ItemSpec = z.object({
   /** Vanilla creative group key (adapter-interpreted); absent = the mod's own tab. */
   group: z.string().regex(ENTRY_ID_RE).optional(),
   maxCount: z.number().int().min(1).max(99).optional(),
+  /** Per-item texture override; only used when the spec sets "textures": true. */
+  texture: TextureSpec.optional(),
 }).strict();
 
 export const BlockSpec = z.object({
@@ -28,6 +47,8 @@ export const BlockSpec = z.object({
   hardness: z.number().min(0).max(50).default(1.5),
   resistance: z.number().min(0).max(1200).default(6),
   tool: z.enum(["pickaxe", "axe", "shovel", "hoe", "none"]).default("pickaxe"),
+  /** Per-block texture override; only used when the spec sets "textures": true. */
+  texture: TextureSpec.optional(),
 }).strict();
 
 export const ModMetaSpec = z.object({
@@ -160,6 +181,8 @@ export const EntitySpec = z
     shadow: z.number().min(0).max(4).default(0.5),
     /** Vanilla model the generated renderer reuses (adapter entityModels key), e.g. pig/humanoid/cow. */
     model: z.string().regex(ENTRY_ID_RE).default("pig"),
+    /** Entity texture override; only used when the spec sets "textures": true. */
+    texture: TextureSpec.optional(),
     /** Drop table; empty = no drops. */
     loot: z
       .array(
@@ -219,6 +242,11 @@ export const ModSpec = z.object({
   ui: UiSpec.default({ screens: [] }),
   /** Emit a runnable data-generation entry point (opt-in; see docs/datagen-evaluation.md option B). */
   datagen: z.boolean().default(false),
+  /**
+   * Paint 16x16 PNG textures for every item/block/entity (opt-in). Off by default so a project whose
+   * art is hand-made keeps it: the generated PNGs are managed files and would be overwritten.
+   */
+  textures: z.boolean().default(false),
 }).strict();
 
 export type ScreenSpecT = z.infer<typeof ScreenSpec>;
