@@ -17,6 +17,9 @@ description: 用 mcmodkit 把一句提示词变成可编译的 Minecraft mod 工
 
 ## 调用序列
 
+> 命令形式：全局链接后可直接用 `mcmod`（`packages/cli` 暴露了 `bin.mcmod`）；
+> 未链接时用 `node packages/cli/dist/index.js` 代替。首次使用前先 `pnpm install && pnpm -r build`。
+
 ```
 list-versions                       # 选 (mcVersion, loader)；看哪些能力该适配器支持
 example -o my-mod.json              # 拿到可用的 Spec 骨架（含各切片示例）
