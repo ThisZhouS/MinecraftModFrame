@@ -194,7 +194,7 @@ Spec 里一段声明：
 | PNG 结构 | 5/5 通过**签名 + IHDR 尺寸 + CRC32 + IDAT inflate 长度**校验（16×16 raw=1040/1040；64×32 raw=8224/8224；crcBad=0） |
 | 引用链路 | 模型/渲染器引用与落盘路径实测对应：`layer0: examplemod:item/ruby` → `textures/item/ruby.png`；`all: examplemod:block/ruby_ore` → `textures/block/ruby_ore.png`；渲染器 `textures/entity/ruby_golem.png` → 同名文件 |
 | 确定性 | 同 Spec 重生成**逐字节一致**（`diff -r` 全等）——seeded mulberry32，无 `Math.random` |
-| 开关关闭时零残留 | `textures:false` ⇒ 45 → 40 个文件，差集恰为 5 个 PNG |
+| 开关关闭时零残留 | `textures:false` ⇒ 45 → 40 个文件，差集恰为 5 个 PNG；生成工程的 README 同步切回「需自备贴图」文案（两个分支均实测） |
 | 多版本 | **三个适配器全覆盖**：Forge 1.20.1 与 NeoForge 1.21.1 用同一 Spec（含 handheld/cube_column）生成同样 5 个 PNG、45 个文件，落盘路径与引用链路同样对应（生成级验证；Fabric 编译级见上表） |
 | 测试 | core 43 项通过（含 PNG 往返编解码、确定性、配色、开关、非法风格字段级报错） |
 | MCP 面 | `scripts/mcp-smoke.mjs` 以宿主方式握手实测：5 个工具齐全、`list_versions` 返回 3 个适配器、`scaffold_mod`（textures + handheld + cube_column）干跑 ok，23 文件、2 个 PNG 路径正确 |
