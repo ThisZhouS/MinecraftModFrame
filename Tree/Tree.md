@@ -12,6 +12,7 @@ MCMOD/
 |   |   |-- 2026-09-scaffolding-tools.md
 |   |   `-- 2026-09-version-api-knowledge.md
 |   |-- acceptance-report.md
+|   |-- adding-a-version.md
 |   |-- datagen-evaluation.md
 |   |-- environment.md
 |   |-- project-brief.md

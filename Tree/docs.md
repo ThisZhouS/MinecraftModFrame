@@ -6,6 +6,7 @@
 
 - `docs/research`
 - `docs/acceptance-report.md`
+- `docs/adding-a-version.md`
 - `docs/datagen-evaluation.md`
 - `docs/environment.md`
 - `docs/project-brief.md`

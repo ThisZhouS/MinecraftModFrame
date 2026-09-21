@@ -235,6 +235,7 @@ MCMODKIT_API_PORT=7431 node packages/api/dist/index.js   # 仅监听 loopback
 
 ## 文档
 
+- **新增版本/加载器：`docs/adding-a-version.md`**（取证清单：javap 签名 / jar 内原版数据 / 官方示例，三步取证 + lint 自查 + 编译验收）
 - 项目简报与决策记录：`docs/project-brief.md`
 - 环境与约束：`docs/environment.md`
 - 调研（含版本 × 加载器 API 知识地图）：`docs/research.md` + `docs/research/`
