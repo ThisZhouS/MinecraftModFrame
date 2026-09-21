@@ -11,6 +11,8 @@
 - `packages/core/src/example.ts`
 - `packages/core/src/generators.ts` - symbols: AdvancementGenOut, BlockGenOut, DataGenOut, EntityGenOut, ItemGenOut, RecipeGenOut, TextureGenOut, UiGenOut, entityLootJson, genAdvancements, genBlocks, genDataGen, genEntities, genItems, genRecipes, genTextures, genUi, ingredientJson, knownContentIds, makeContext, resolveItemRef
 - `packages/core/src/ids.ts`
+- `packages/core/src/image-ops.ts` - symbols: crop, paeth
+- `packages/core/src/image-provider.ts` - symbols: GenerationResponse, withTimeout
 - `packages/core/src/index.ts`
 - `packages/core/src/png.ts` - symbols: chunk, crc32
 - `packages/core/src/render.ts` - symbols: render

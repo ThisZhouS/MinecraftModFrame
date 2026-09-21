@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "mod": {
+    "modId": "mk2",
+    "name": "MK2",
+    "version": "1.0.0",
+    "description": "MK2 - a fishing rod for Minecraft 1.20.1 (Forge).",
+    "authors": ["mcmodkit"],
+    "license": "MIT"
+  },
+  "target": { "mcVersion": "1.20.1", "loader": "forge" },
+  "textures": true,
+  "textureProvider": "image-api",
+  "content": {
+    "items": [
+      {
+        "id": "mk2",
+        "name": "MK2",
+        "behavior": "fishing_rod",
+        "model": "handheld",
+        "maxCount": 1,
+        "durability": 128,
+        "texture": {
+          "prompt": "Minecraft pixel art item icon: a wooden fishing rod with a reel, fishing line and hook, 16-bit pixel art style, transparent background, centered, bold dark outlines, limited warm brown palette, no text",
+          "size": 32
+        }
+      }
+    ]
+  }
+}

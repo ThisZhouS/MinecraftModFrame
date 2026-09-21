@@ -4,7 +4,9 @@
 
 ## 内容
 
+- `packages/core/test/behavior.test.ts` - symbols: planFor, registryBody
 - `packages/core/test/fixture-adapter.ts`
+- `packages/core/test/image.test.ts` - symbols: alphaAt, checkerboardWithSubject, makeRgbPng
 - `packages/core/test/models.test.ts` - symbols: modelBody, planFor
 - `packages/core/test/pipeline.test.ts` - symbols: parseSpecOrThrow, plan
 - `packages/core/test/texture.test.ts` - symbols: decodePng

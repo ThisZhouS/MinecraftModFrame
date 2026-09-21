@@ -28,6 +28,17 @@ export const TextureSpec = z.object({
   style: z.enum(TEXTURE_STYLES).default("speckle"),
   /** Override the derived RNG seed to get a different pattern for the same id. */
   seed: z.number().int().min(0).max(4294967295).optional(),
+  /**
+   * Prompt for an image-model provider (spec.textureProvider != "procedural"). Ignored by the
+   * procedural painter, which is driven by style/palette/seed instead.
+   */
+  prompt: z.string().min(1).optional(),
+  /**
+   * Output texture size in pixels. 16 is the vanilla item standard; larger sizes keep more of the
+   * detail an image model produces (a 1920px render averaged down to 16px loses thin features such
+   * as a fishing line). Minecraft accepts any power-of-two size.
+   */
+  size: z.number().int().min(8).max(256).refine((n) => (n & (n - 1)) === 0, "size must be a power of two (16, 32, 64...)").optional(),
 }).strict();
 
 export const ItemSpec = z.object({
@@ -44,6 +55,15 @@ export const ItemSpec = z.object({
    * tilted in third person). Purely a model-JSON choice — the texture path is the same either way.
    */
   model: z.enum(["generated", "handheld"]).default("generated"),
+  /**
+   * Behaviour key from the adapter's itemBehaviors map. "plain" is a bare Item; other keys (e.g.
+   * "fishing_rod") select a subclass with real behaviour. Kept as a free key rather than an enum so
+   * a new adapter can offer new behaviours without an engine release — an unknown key is a clear
+   * error listing what the adapter does offer.
+   */
+  behavior: z.string().regex(ENTRY_ID_RE).default("plain"),
+  /** Max damage before the item breaks; sets the vanilla durability bar. */
+  durability: z.number().int().min(1).max(100000).optional(),
 }).strict();
 
 export const BlockSpec = z.object({
@@ -257,6 +277,15 @@ export const ModSpec = z.object({
    * art is hand-made keeps it: the generated PNGs are managed files and would be overwritten.
    */
   textures: z.boolean().default(false),
+  /**
+   * Where texture pixels come from. "procedural" (default) paints locally and deterministically;
+   * "image-api" calls a configured image model for any content that declares a `texture.prompt`,
+   * falling back to the procedural painter for everything else.
+   *
+   * The endpoint, model and credential come from the environment (MCMODKIT_IMAGE_*), never from the
+   * spec — a spec is a shareable artefact and must not carry a secret.
+   */
+  textureProvider: z.enum(["procedural", "image-api"]).default("procedural"),
 }).strict();
 
 export type ScreenSpecT = z.infer<typeof ScreenSpec>;

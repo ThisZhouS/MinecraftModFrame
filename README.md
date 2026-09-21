@@ -78,6 +78,46 @@ out/my-mod/
 
 `generated` / `handheld`（工具、武器握持姿态）与 `cube_all` / `cube_column`（原木、柱子：顶底与侧面分开）。**模型形态不改变贴图路径**——仍是 `item/<id>.png` / `block/<id>.png`。模型 JSON 本体是适配器数据（`itemModelHandheld` / `blockModelColumn`），引擎只做选择；适配器没有该模板时给出可修复的报错而非产出坏文件。
 
+## 真实图像模型（AI 生图，可选）
+
+上面那套是**本地程序化绘制**；要真正调用图像模型，把 `textureProvider` 设为 `image-api`，并在内容上写 `texture.prompt`：
+
+```jsonc
+{
+  "textures": true,
+  "textureProvider": "image-api",
+  "content": {
+    "items": [
+      { "id": "mk2", "texture": { "prompt": "Minecraft pixel art item icon: a wooden fishing rod...", "size": 32 } }
+    ]
+  }
+}
+```
+
+```bash
+export MCMODKIT_IMAGE_API_URL="https://ark.cn-beijing.volces.com/api/plan/v3/images/generations"
+export MCMODKIT_IMAGE_API_KEY="<your key>"
+export MCMODKIT_IMAGE_MODEL="doubao-seedream-5.0-lite"
+node packages/cli/dist/index.js gen examples/mk2-fishing-rod-forge-1.20.1.json -o out
+```
+
+- **凭据只从环境变量读**（`MCMODKIT_IMAGE_API_URL` / `_API_KEY` / `_MODEL` / `_SIZE` / `_FORMAT` / `_TIMEOUT`）。Spec 是可提交、可分享的产物，**绝不能带密钥**——框架会在缺 key 时直接报错而不是悄悄降级。
+- 模型出图是**大尺寸不透明**的（实测 1920×1920、RGB 无 alpha），管线自动完成：解码 PNG → 抠背景（模型常把"透明"画成棋盘格）→ 去杂点 → **裁剪到主体** → 保比例缩放到 16/32/64 → 编码成带 alpha 的 PNG。
+- **裁剪到主体是关键**：生成的图里主体只占半个画幅，整幅缩到 16px 会把像素浪费在背景上。**去杂点**同样必要——两个角落的杂点会把包围盒撑满整幅，主体被缩成缩略图。
+- 没有 `prompt` 的内容仍走本地绘制；`--dry-run` **不联网**（干跑不该花钱）。
+- 网络步骤在 `planGeneration` **之外**：生成计划始终是同步、无 I/O 的纯函数，图像字节由调用方预取后传入——这样生成器可离线测试。
+- `size` 建议 32：实测 1920px 的图缩到 16px 会把钓线这类细特征平均掉，32px 能保住。
+
+## 物品行为（可选）
+
+框架默认产出裸 `Item`。要真正有行为（比如钓鱼竿要能抛竿），用 `behavior` 选一个适配器提供的构造式：
+
+```jsonc
+{ "id": "mk2", "behavior": "fishing_rod", "model": "handheld", "maxCount": 1, "durability": 128 }
+```
+
+产出 `ITEMS.register("mk2", () -> new FishingRodItem(new Item.Properties().stacksTo(1).durability(128)))`，并按需注入 `import net.minecraft.world.item.FishingRodItem;`（**只导入用到的**）。类名与构造式是**适配器数据**（`itemBehaviors` / `itemBehaviorImports`），引擎不认识任何 Minecraft 类名；未知 behavior 给出列出可用取值的报错。
+
 ## 贴图生成（生图，可选，默认关闭）
 
 ```jsonc

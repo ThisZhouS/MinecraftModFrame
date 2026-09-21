@@ -38,6 +38,11 @@ export interface GenContext {
   adapter: AdapterRecordT;
   vars: Record<string, string>;
   warnings: string[];
+  /**
+   * Pre-generated texture PNGs keyed by "<kind>:<id>" (see prefetchTextures). Supplied by the
+   * caller so planning stays synchronous and free of I/O; absent = paint locally.
+   */
+  images?: Map<string, Uint8Array>;
 }
 
 /** Flatten spec+adapter into the global template variable set. */
@@ -106,8 +111,8 @@ export function buildVars(spec: ModSpecT, adapter: AdapterRecordT): Record<strin
   };
 }
 
-function makeContext(spec: ModSpecT, adapter: AdapterRecordT): GenContext {
-  return { spec, adapter, vars: buildVars(spec, adapter), warnings: [] };
+function makeContext(spec: ModSpecT, adapter: AdapterRecordT, images?: Map<string, Uint8Array>): GenContext {
+  return { spec, adapter, vars: buildVars(spec, adapter), warnings: [], images };
 }
 
 interface ItemGenOut {
@@ -128,17 +133,31 @@ function genItems(ctx: GenContext): ItemGenOut {
     const display = item.name ?? toDisplayName(item.id);
     const v = { ...ctx.vars, CONST: constName, CONST_UPPER: toScreamingSnake(constName), REG_NAME: item.id, DISPLAY: display, id: item.id };
     const settingsKey = item.maxCount != null ? "itemSettingsMaxCount" : "itemSettings";
-    const settings = renderTemplate(ctx.adapter.templates[settingsKey]!, { ...v, MAX_COUNT: String(item.maxCount ?? 64) }, settingsKey);
+    const durabilitySuffix = item.durability === undefined ? "" : `.durability(${item.durability})`;
+    const settings = renderTemplate(
+      ctx.adapter.templates[settingsKey]!,
+      { ...v, MAX_COUNT: String(item.maxCount ?? 64), DURABILITY_SUFFIX: durabilitySuffix },
+      settingsKey,
+    );
+    const behaviorExpr = ctx.adapter.itemBehaviors[item.behavior];
+    if (behaviorExpr === undefined) {
+      throw new McmodError(
+        "SPEC_INVALID",
+        `item "${item.id}": behavior "${item.behavior}" is not offered by adapter ${ctx.adapter.id}; available: ${Object.keys(ctx.adapter.itemBehaviors).join(", ")}`,
+        { id: item.id, behavior: item.behavior },
+      );
+    }
+    const itemCtor = renderTemplate(behaviorExpr, { ...v, SETTINGS: settings }, `itemBehaviors.${item.behavior}`);
     const groupExpr = item.group != null ? ctx.adapter.vanillaGroups[item.group] : undefined;
     let registration: string;
     if (item.group != null && groupExpr != null) {
-      registration = renderTemplate(ctx.adapter.templates.itemRegistration!, { ...v, SETTINGS: settings }, "itemRegistration");
-      out.groupHooks.push(renderTemplate(ctx.adapter.templates.itemRegistrationGroup!, { ...v, SETTINGS: settings, GROUP_EXPR: groupExpr }, "itemRegistrationGroup"));
+      registration = renderTemplate(ctx.adapter.templates.itemRegistration!, { ...v, SETTINGS: settings, ITEM_CTOR: itemCtor }, "itemRegistration");
+      out.groupHooks.push(renderTemplate(ctx.adapter.templates.itemRegistrationGroup!, { ...v, SETTINGS: settings, ITEM_CTOR: itemCtor, GROUP_EXPR: groupExpr }, "itemRegistrationGroup"));
     } else {
       if (item.group != null) {
         ctx.warnings.push(`item "${item.id}": unknown group "${item.group}" for adapter ${ctx.adapter.id}; placed in the mod's own tab`);
       }
-      registration = renderTemplate(ctx.adapter.templates.itemRegistration!, { ...v, SETTINGS: settings }, "itemRegistration");
+      registration = renderTemplate(ctx.adapter.templates.itemRegistration!, { ...v, SETTINGS: settings, ITEM_CTOR: itemCtor }, "itemRegistration");
       out.tabEntries.push(renderTemplate(ctx.adapter.templates.tabEntryLineItem!, { ...v }, "tabEntryLineItem"));
     }
     out.itemRegistrations.push(registration);
@@ -761,30 +780,36 @@ function genTextures(ctx: GenContext): TextureGenOut {
   };
 
   for (const item of ctx.spec.content.items) {
+    const generated = ctx.images?.get(`item:${item.id}`);
     push(
       paths.itemTexture,
       item.id,
-      paintTexturePng({
-        id: item.id,
-        // Items default to a flecked gem/metal look; blocks to a rougher material look.
-        style: item.texture?.style ?? "speckle",
-        palette: item.texture?.palette,
-        seed: item.texture?.seed,
-      }),
-      `texture:item:${item.id}`,
+      generated ??
+        paintTexturePng({
+          id: item.id,
+          // Items default to a flecked gem/metal look; blocks to a rougher material look.
+          style: item.texture?.style ?? "speckle",
+          palette: item.texture?.palette,
+          seed: item.texture?.seed,
+          size: item.texture?.size,
+        }),
+      generated ? `texture:item:${item.id}:image-api` : `texture:item:${item.id}`,
     );
   }
   for (const block of ctx.spec.content.blocks) {
+    const generated = ctx.images?.get(`block:${block.id}`);
     push(
       paths.blockTexture,
       block.id,
-      paintTexturePng({
-        id: block.id,
-        style: block.texture?.style ?? "noise",
-        palette: block.texture?.palette,
-        seed: block.texture?.seed,
-      }),
-      `texture:block:${block.id}`,
+      generated ??
+        paintTexturePng({
+          id: block.id,
+          style: block.texture?.style ?? "noise",
+          palette: block.texture?.palette,
+          seed: block.texture?.seed,
+          size: block.texture?.size,
+        }),
+      generated ? `texture:block:${block.id}:image-api` : `texture:block:${block.id}`,
     );
   }
   if (ctx.spec.content.entities.length > 0) {
@@ -796,16 +821,18 @@ function genTextures(ctx: GenContext): TextureGenOut {
       );
     }
     for (const entity of ctx.spec.content.entities) {
+      const generated = ctx.images?.get(`entity:${entity.id}`);
       push(
         paths.entityTexture,
         entity.id,
-        paintEntitySheetPng({
-          id: entity.id,
-          style: entity.texture?.style ?? "noise",
-          palette: entity.texture?.palette,
-          seed: entity.texture?.seed,
-        }),
-        `texture:entity:${entity.id}`,
+        generated ??
+          paintEntitySheetPng({
+            id: entity.id,
+            style: entity.texture?.style ?? "noise",
+            palette: entity.texture?.palette,
+            seed: entity.texture?.seed,
+          }),
+        generated ? `texture:entity:${entity.id}:image-api` : `texture:entity:${entity.id}`,
       );
     }
   }
@@ -818,11 +845,16 @@ export interface PlanOptions {
    * assetFiles (e.g. the gradle wrapper jar) - the adapters package supplies this.
    */
   resolveAsset?: (assetKey: string) => string;
+  /**
+   * Texture PNGs produced by an image-model provider, keyed "<kind>:<id>". Planning itself never
+   * touches the network — callers run prefetchTextures first and pass the result in here.
+   */
+  images?: Map<string, Uint8Array>;
 }
 
 /** Pure: spec + adapter -> file plan (no I/O). */
 export function planGeneration(spec: ModSpecT, adapter: AdapterRecordT, options: PlanOptions = {}): GenerationPlan {
-  const ctx = makeContext(spec, adapter);
+  const ctx = makeContext(spec, adapter, options.images);
   const files: FileEntry[] = [];
 
   // Duplicate content ids would collide in registries, models and lang — reject early.
@@ -886,11 +918,24 @@ export function planGeneration(spec: ModSpecT, adapter: AdapterRecordT, options:
   files.push(...items.files, ...blocks.files);
 
   const tabBlock = renderTemplate(adapter.templates.tabBlock!, { ...ctx.vars, TAB_ENTRIES: items.tabEntries.concat(blocks.tabEntries).join("\n") }, "tabBlock");
+  // Only import the classes the spec actually asked for; an unused import is a warning in some
+  // setups and noise in every code review.
+  const usedBehaviorImports = [...new Set(spec.content.items.map((i) => adapter.itemBehaviorImports[i.behavior]))]
+    .filter((fq): fq is string => fq !== undefined)
+    .sort()
+    .map((fq) => `import ${fq};`)
+    .join("\n");
   files.push({
     path: `${javaDir}${adapter.mainClassSimpleName}Items.java`,
     content: renderTemplate(
       adapter.templates.itemsRegistryClass!,
-      { ...ctx.vars, ITEM_REGISTRATIONS: items.itemRegistrations.join("\n"), TAB_BLOCK: tabBlock, ITEM_GROUP_HOOKS: items.groupHooks.join("\n") },
+      {
+        ...ctx.vars,
+        ITEM_REGISTRATIONS: items.itemRegistrations.join("\n"),
+        TAB_BLOCK: tabBlock,
+        ITEM_GROUP_HOOKS: items.groupHooks.join("\n"),
+        ITEM_BEHAVIOR_IMPORTS: usedBehaviorImports,
+      },
       "itemsRegistryClass",
     ),
     managed: true, executable: false, reason: "items-registry",

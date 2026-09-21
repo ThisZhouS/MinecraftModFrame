@@ -175,6 +175,21 @@ export const AdapterRecord = z.object({
   gradle: z.record(z.string(), z.unknown()),
   /** group key -> constant expression usable inside the registration template. */
   vanillaGroups: z.record(z.string(), z.string()),
+  /**
+   * Item behaviour key -> the Java expression that constructs the item, with {{SETTINGS}} standing
+   * for the Item.Properties expression. Lives here because the class and its constructor differ per
+   * version and loader (a fishing rod is `FishingRodItem` on both 1.20.1 and 1.21.1, but that is a
+   * version fact, not an engine fact). "plain" must always exist and is the default.
+   */
+  itemBehaviors: z
+    .record(z.string(), z.string())
+    .default({ plain: "new Item({{SETTINGS}})" }),
+  /**
+   * Behaviour key -> fully qualified class the generated registry must import. Only behaviours the
+   * spec actually uses get imported, so a project that never asks for a fishing rod does not carry
+   * a dangling import.
+   */
+  itemBehaviorImports: z.record(z.string(), z.string()).default({}),
   /** Binary/large files shipped with the adapter package (e.g. gradle-wrapper.jar). */
   assetFiles: z.array(z.object({ path: z.string(), asset: z.string() })).default([]),
   projectFiles: z.array(TemplateFileSpec).min(1),
@@ -213,10 +228,12 @@ function normalizeForLint(a: AdapterRecordT, s: string): string {
 /** Placeholders a template must consume or its emitted code silently loses information. */
 const REQUIRED_PLACEHOLDERS: Record<string, string[]> = {
   // {{CONST}} (as written) and {{CONST_UPPER}} (SCREAMING_SNAKE) are both supplied to templates.
-  itemRegistration: ["{{REG_NAME}}", "{{SETTINGS}}"],
+  // {{ITEM_CTOR}} lets the spec pick an item class (plain / fishing rod / ...) without the engine
+  // knowing any Minecraft class name; {{DURABILITY_SUFFIX}} keeps durability out of the engine too.
+  itemRegistration: ["{{REG_NAME}}", "{{ITEM_CTOR}}"],
   blockRegistration: ["{{REG_NAME}}", "{{SETTINGS}}"],
-  itemSettings: ["{{MAX_COUNT}}"],
-  itemSettingsMaxCount: ["{{MAX_COUNT}}"],
+  itemSettings: ["{{DURABILITY_SUFFIX}}"],
+  itemSettingsMaxCount: ["{{MAX_COUNT}}", "{{DURABILITY_SUFFIX}}"],
   tabEntryLineItem: ["{{CONST"],
   tabEntryLineBlock: ["{{CONST"],
   blockState: ["{{REG_NAME}}"],
@@ -368,9 +385,26 @@ export function lintAdapter(a: AdapterRecordT): string[] {
     const body = a.templates[key];
     if (body === undefined) continue;
     for (const ph of wanted) {
-      // itemSettings/itemSettingsMaxCount must both expose {{MAX_COUNT}} only if the generator uses it.
-      if (key === "itemSettings" && ph === "{{MAX_COUNT}}") continue;
       if (!body.includes(ph)) problems.push(`template "${key}" must use ${ph}`);
+    }
+  }
+  // Every item must be constructible: without "plain" a spec that names no behaviour cannot build.
+  if (a.itemBehaviors.plain === undefined) {
+    problems.push('itemBehaviors must define "plain" (the default item constructor)');
+  }
+  if (Object.keys(a.itemBehaviorImports).length > 0) {
+    if (!(a.templates.itemsRegistryClass ?? "").includes("{{ITEM_BEHAVIOR_IMPORTS}}")) {
+      problems.push("adapter declares itemBehaviorImports but itemsRegistryClass has no {{ITEM_BEHAVIOR_IMPORTS}} injection point");
+    }
+    for (const key of Object.keys(a.itemBehaviorImports)) {
+      if (a.itemBehaviors[key] === undefined) {
+        problems.push(`itemBehaviorImports.${key} has no matching itemBehaviors entry`);
+      }
+    }
+  }
+  for (const [key, expr] of Object.entries(a.itemBehaviors)) {
+    if (!expr.includes("{{SETTINGS}}")) {
+      problems.push(`itemBehaviors.${key} must use {{SETTINGS}} or the item ignores its properties`);
     }
   }
   return problems;

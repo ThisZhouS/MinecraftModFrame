@@ -33,13 +33,13 @@ export function makeFixtureAdapter(): AdapterRecordT {
       wrapperProps: "distributionUrl=gradle-{{gradleWrapperVersion}}-bin.zip\n",
       mainClass: "package {{packageName}};\n// entrypoint {{mainClassFq}} for {{modId}}\n",
       itemsRegistryClass:
-        "package {{packageName}};\npublic class ModMainItems {\n{{ITEM_REGISTRATIONS}}\nstatic void init() {\n{{TAB_BLOCK}}\n{{ITEM_GROUP_HOOKS}}\n}\n}\n",
+        "package {{packageName}};\n{{ITEM_BEHAVIOR_IMPORTS}}\npublic class ModMainItems {\n{{ITEM_REGISTRATIONS}}\nstatic void init() {\n{{TAB_BLOCK}}\n{{ITEM_GROUP_HOOKS}}\n}\n}\n",
       blocksRegistryClass:
         "package {{packageName}};\npublic class ModMainBlocks {\n{{BLOCK_REGISTRATIONS}}\n}\n",
-      itemRegistration: "register({{REG_NAME}}, new Item({{SETTINGS}}));",
-      itemRegistrationGroup: "registerIn({{GROUP_EXPR}}, {{REG_NAME}}, new Item({{SETTINGS}}));",
-      itemSettings: "Settings.DEFAULT",
-      itemSettingsMaxCount: "Settings.DEFAULT.maxCount({{MAX_COUNT}})",
+      itemRegistration: "register({{REG_NAME}}, {{ITEM_CTOR}});",
+      itemRegistrationGroup: "registerIn({{GROUP_EXPR}}, {{REG_NAME}}, {{ITEM_CTOR}});",
+      itemSettings: "Settings.DEFAULT{{DURABILITY_SUFFIX}}",
+      itemSettingsMaxCount: "Settings.DEFAULT.maxCount({{MAX_COUNT}}){{DURABILITY_SUFFIX}}",
       blockRegistration: "registerBlock({{REG_NAME}}, new Block({{SETTINGS}}));",
       blockSettings: "Settings.DEFAULT.strength({{HARDNESS}}, {{RESISTANCE}}).requiresTool()",
       blockSettingsNoTool: "Settings.DEFAULT.strength({{HARDNESS}}, {{RESISTANCE}})",
@@ -96,6 +96,9 @@ export function makeFixtureAdapter(): AdapterRecordT {
       advancementTitle: "advancements.{{namespace}}.{{id}}.title",
       advancementDescription: "advancements.{{namespace}}.{{id}}.description",
     },
+    // Adapter-level (not template) data: how an item is constructed, and what to import for it.
+    itemBehaviors: { plain: "new Item({{SETTINGS}})", fishing_rod: "new FishingRod({{SETTINGS}})" },
+    itemBehaviorImports: { fishing_rod: "com.example.FishingRod" },
     notes: ["fixture adapter for core tests"],
   };
 }

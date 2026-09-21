@@ -19,6 +19,42 @@ MCMOD/
 |   |-- requirements.md
 |   |-- research.md
 |   `-- tasks.md
+|-- examples
+|   `-- mk2-fishing-rod-forge-1.20.1.json
+|-- out
+|   `-- mk2
+|       |-- gradle
+|       |   `-- wrapper
+|       |       |-- gradle-wrapper.jar
+|       |       `-- gradle-wrapper.properties
+|       |-- src
+|       |   `-- main
+|       |       |-- java
+|       |       |   `-- com
+|       |       |       `-- mk2
+|       |       |           |-- ModMain.java
+|       |       |           |-- ModMainBlocks.java
+|       |       |           `-- ModMainItems.java
+|       |       `-- resources
+|       |           |-- assets
+|       |           |   `-- mk2
+|       |           |       |-- lang
+|       |           |       |   `-- en_us.json
+|       |           |       |-- models
+|       |           |       |   `-- item
+|       |           |       |       `-- mk2.json
+|       |           |       `-- textures
+|       |           |           `-- item
+|       |           |               `-- mk2.png
+|       |           |-- META-INF
+|       |           |   `-- mods.toml
+|       |           `-- pack.mcmeta
+|       |-- build.gradle
+|       |-- gradle.properties
+|       |-- gradlew
+|       |-- gradlew.bat
+|       |-- README.md
+|       `-- settings.gradle
 |-- packages
 |   |-- adapters
 |   |   |-- assets
@@ -72,13 +108,17 @@ MCMOD/
 |   |   |   |-- example.ts
 |   |   |   |-- generators.ts
 |   |   |   |-- ids.ts
+|   |   |   |-- image-ops.ts
+|   |   |   |-- image-provider.ts
 |   |   |   |-- index.ts
 |   |   |   |-- png.ts
 |   |   |   |-- render.ts
 |   |   |   |-- spec.ts
 |   |   |   `-- texture.ts
 |   |   |-- test
+|   |   |   |-- behavior.test.ts
 |   |   |   |-- fixture-adapter.ts
+|   |   |   |-- image.test.ts
 |   |   |   |-- models.test.ts
 |   |   |   |-- pipeline.test.ts
 |   |   |   |-- texture.test.ts

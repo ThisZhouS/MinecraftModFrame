@@ -25,6 +25,17 @@
 - `packages/api`：`node:http` JSON API（`/api/versions`、`/api/validate`、`/api/generate` 等）。
 - 测试分布：core 14、adapters 10、cli 4、mcp-server 6、api 6。
 
+## S13 交付物（真实图像模型 + 物品行为，已完成）
+
+**真实图像模型（AI 生图）**：`textureProvider: "image-api"` + 内容级 `texture.prompt` / `texture.size`。
+- `packages/core/src/image-ops.ts`：零依赖 PNG 解码（8bit RGB/RGBA、非交错；其余显式报错不猜）、边界泛洪抠背景、**最大连通域去杂点**、保比例缩放（**预乘 alpha** 平均，避免透明像素把颜色拉黑）。
+- `packages/core/src/image-provider.ts`：调用图像 API；**凭据只走环境变量**（`MCMODKIT_IMAGE_*`），Spec 永不携带密钥，缺 key 直接报错不降级。
+- 网络步骤刻意放在 `planGeneration` **之外**：生成计划仍是同步纯函数，调用方 `prefetchTextures` 后传入字节。`--dry-run` 不联网。
+- **物品行为**：`items[].behavior`（适配器 `itemBehaviors` / `itemBehaviorImports`）+ `items[].durability`；模板新增 `{{ITEM_CTOR}}` / `{{DURABILITY_SUFFIX}}` / `{{ITEM_BEHAVIOR_IMPORTS}}` 注入点，lint 强制。
+- NeoForge 的 `itemRegistration` 由 `registerSimpleItem` 改为 `ITEMS.register(name, supplier)`（前者无法表达自定义类）——**未编译验证**（本机无法访问 maven.neoforged.net），已写入该适配器 `notes`。
+- 验收：**Forge 1.20.1 真编译通过**，产出 `mk2-1.0.0.jar`；`javap` 确认字节码为 `new net/minecraft/world/item/FishingRodItem` + `(Item$Properties)V`；AI 生成的 32×32 贴图（1080 B）在 jar 内。core 61 项测试（含 11 项图像、7 项行为）通过，全套 97 项通过。
+- 未做：图像模型出图质量未做系统评估（仅人工看过一例）；未接图像编辑/重绘；实体贴图仍是程序化占位。
+
 ## S12 交付物（模型形态，已完成）
 
 - Spec 新增 `items[].model`（`generated`/`handheld`）与 `blocks[].model`（`cube_all`/`cube_column`）。

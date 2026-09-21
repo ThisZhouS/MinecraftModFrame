@@ -2,6 +2,8 @@ export * from "./ids.js";
 export * from "./render.js";
 export * from "./png.js";
 export * from "./texture.js";
+export * from "./image-ops.js";
+export * from "./image-provider.js";
 export * from "./errors.js";
 export * from "./spec.js";
 export * from "./adapter-contract.js";

@@ -4,3 +4,13 @@ dist/
 *.log
 Temp/
 .DS_Store
+
+# Generated mod projects (regenerate from the spec; never edit them by hand).
+out/
+
+# Toolchains downloaded for build verification (Gradle distributions, JDKs).
+.tools/
+
+# Local image-provider credentials, when kept in a file rather than the environment.
+.env
+.env.*
