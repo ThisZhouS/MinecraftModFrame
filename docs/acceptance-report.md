@@ -201,6 +201,18 @@ Spec 里一段声明：
 
 设计取舍：贴图走**参数化程序化绘制**而非调用图像模型——离线、瞬时、**可复现**。可复现是关键：改图会体现为 diff，而不是不可复现的噪声；接真实模型只需替换 `paintTexture` 一个函数。
 
+### 9b.1 模型形态（handheld / cube_column）
+
+| 项 | 证据 |
+| --- | --- |
+| 真编译 | 开启 `textures` + `handheld` 物品 + `cube_column` 方块，Fabric **PASS**（`gradle build` 退出码 0，产出 jar） |
+| 进 jar | jar 内 `models/item/ruby.json`（95 B，handheld）、`models/block/ruby_ore.json`（140 B，cube_column）与 5 个贴图齐全 |
+| 形态切换 | 生成级实测：`"parent": "minecraft:item/handheld"`；`cube_column` 同时绑定 `end`/`side` 且**不改变贴图路径** |
+| 错误路径 | 单测：未知形态 → 字段级报错；适配器缺该模板 → 可修复错误（而非产出坏文件） |
+| 文档一致性 | 生成工程 README 的贴图段落改为条件化 `{{TEXTURE_NOTES}}`（lint 强制），修掉「已生成贴图却提示自备」的矛盾 |
+
+说明：模型 JSON 的语义**不由 `gradle build` 校验**（同 S8 的方法学），因此上面的「真编译」证明的是工程仍可构建、资源正确进 jar；JSON 语义由生成级比对与单测承担。
+
 ## 10. 本轮交付的其他能力
 
 - Spec 新增 `ui.screens[]`（id/title/key/width/height/lines），缺省值可省略；非法键给出字段级报错。
