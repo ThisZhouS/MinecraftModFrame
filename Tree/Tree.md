@@ -78,6 +78,7 @@ MCMOD/
 |   |   |   `-- texture.ts
 |   |   |-- test
 |   |   |   |-- fixture-adapter.ts
+|   |   |   |-- models.test.ts
 |   |   |   |-- pipeline.test.ts
 |   |   |   |-- texture.test.ts
 |   |   |   `-- unit.test.ts

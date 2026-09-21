@@ -67,6 +67,17 @@ out/my-mod/
         └── data/<ns>/loot_table/…, data/minecraft/tags/block/…   # 1.21+ 单数目录
 ```
 
+## 模型形态（可选）
+
+```jsonc
+"content": {
+  "items":  [ { "id": "ruby_pick",  "model": "handheld" } ],   // 默认 generated（平铺图标）
+  "blocks": [ { "id": "ruby_pillar", "model": "cube_column" } ] // 默认 cube_all（六面同图）
+}
+```
+
+`generated` / `handheld`（工具、武器握持姿态）与 `cube_all` / `cube_column`（原木、柱子：顶底与侧面分开）。**模型形态不改变贴图路径**——仍是 `item/<id>.png` / `block/<id>.png`。模型 JSON 本体是适配器数据（`itemModelHandheld` / `blockModelColumn`），引擎只做选择；适配器没有该模板时给出可修复的报错而非产出坏文件。
+
 ## 贴图生成（生图，可选，默认关闭）
 
 ```jsonc

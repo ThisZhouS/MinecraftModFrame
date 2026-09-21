@@ -253,6 +253,8 @@ const REQUIRED_PLACEHOLDERS: Record<string, string[]> = {
   dataGenClass: ["{{DATAGEN_PROVIDER_CLASS}}"],
   dataGenProvider: ["{{DATAGEN_PROVIDER_CLASS}}", "{{modId}}", "{{namespace}}"],
   dataGenRunConfig: [],
+  // Without this the project README tells users to hand-draw art the generator already painted.
+  projectReadme: ["{{TEXTURE_NOTES}}"],
 };
 
 /** Static sanity checks beyond the schema: referenced template keys must exist and stay wired up. */

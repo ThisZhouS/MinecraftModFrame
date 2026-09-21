@@ -39,6 +39,11 @@ export const ItemSpec = z.object({
   maxCount: z.number().int().min(1).max(99).optional(),
   /** Per-item texture override; only used when the spec sets "textures": true. */
   texture: TextureSpec.optional(),
+  /**
+   * Item model shape: "generated" (flat sprite, the default) or "handheld" (held like a tool,
+   * tilted in third person). Purely a model-JSON choice — the texture path is the same either way.
+   */
+  model: z.enum(["generated", "handheld"]).default("generated"),
 }).strict();
 
 export const BlockSpec = z.object({
@@ -49,6 +54,11 @@ export const BlockSpec = z.object({
   tool: z.enum(["pickaxe", "axe", "shovel", "hoe", "none"]).default("pickaxe"),
   /** Per-block texture override; only used when the spec sets "textures": true. */
   texture: TextureSpec.optional(),
+  /**
+   * Block model shape: "cube_all" (same texture on every face, the default) or "cube_column"
+   * (logs/pillars: distinct top/bottom). Both fit the default single-variant blockstate.
+   */
+  model: z.enum(["cube_all", "cube_column"]).default("cube_all"),
 }).strict();
 
 export const ModMetaSpec = z.object({

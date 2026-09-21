@@ -25,6 +25,14 @@
 - `packages/api`：`node:http` JSON API（`/api/versions`、`/api/validate`、`/api/generate` 等）。
 - 测试分布：core 14、adapters 10、cli 4、mcp-server 6、api 6。
 
+## S12 交付物（模型形态，已完成）
+
+- Spec 新增 `items[].model`（`generated`/`handheld`）与 `blocks[].model`（`cube_all`/`cube_column`）。
+- 模型 JSON 本体作为适配器模板（`itemModelHandheld` / `blockModelColumn`，三适配器各 +2），引擎按 Spec 选择；缺模板时报可修复错误而非产出坏文件。
+- 生成工程的 README 文本改为**条件化**（`{{TEXTURE_NOTES}}`，lint 强制）：开了贴图就说「已生成，改 Spec 而非改 PNG」，否则提示自备——避免文档与实际产物矛盾。
+- 验收：43 项 core 测试（含形态切换、贴图路径不变、未知形态字段级报错、缺模板报错）；三适配器 lint clean；生成级实测 handheld/cube_column 正确。
+- 说明：模型形态是**纯资源 JSON**，`gradle build` 不校验其语义（见 S8 方法学），故以生成级 + 单测验证；编译验证由贴图切片承担。
+
 ## S11 交付物（贴图生成 / 生图，已完成）
 
 - Spec 新增 `textures`（默认 false，受管文件不可默认覆盖手工美术）与物品/方块/实体级 `texture: { style, palette, seed }`。

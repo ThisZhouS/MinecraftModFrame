@@ -47,9 +47,9 @@ export function makeFixtureAdapter(): AdapterRecordT {
       tabEntryLineItem: "tab.add(ModMainItems.{{CONST}});",
       tabEntryLineBlock: "tab.add(ModMainBlocks.{{CONST}});",
       blockState: '{"variants":{"":{"model":"{{namespace}}:block/{{REG_NAME}}"}}}\n',
-      blockModel: '{"parent":"block/cube_all","textures":{"all":"{{namespace}}:block/{{REG_NAME}}"}}\n',
+      blockModel: '{"parent":"minecraft:block/cube_all","textures":{"all":"{{namespace}}:block/{{REG_NAME}}"}}\n',
       blockItemModel: '{"parent":"{{namespace}}:block/{{REG_NAME}}"}\n',
-      itemModel: '{"parent":"item/generated","textures":{"layer0":"{{namespace}}:item/{{REG_NAME}}"}}\n',
+      itemModel: '{"parent":"minecraft:item/generated","textures":{"layer0":"{{namespace}}:item/{{REG_NAME}}"}}\n',
       lootTable: '{"type":"minecraft:block","pools":[]}\n',
       mineableTag: '{"replace": false,"values": [\n    {{VALUES}}\n  ]}\n',
       // UI templates: fake bodies, but they must consume every placeholder the engine supplies.
@@ -68,6 +68,8 @@ export function makeFixtureAdapter(): AdapterRecordT {
         '{{{ADV_PARENT_LINE}}{{ADV_BACKGROUND_LINE}}"display":{"icon":{"item":"{{ADV_ICON_ITEM}}"},"title":{{ADV_TITLE_JSON}},"description":{{ADV_DESCRIPTION_JSON}},"frame":"{{ADV_FRAME}}","show_toast":{{ADV_SHOW_TOAST}},"announce_to_chat":{{ADV_ANNOUNCE_TO_CHAT}},"hidden":{{ADV_HIDDEN}}},"criteria":{{ADV_CRITERIA_JSON}},{{ADV_REWARDS_LINE}}"requirements":{{ADV_REQUIREMENTS_JSON}}}\n',
       advancementItemPredicate: '{"items":{"item":"{{ITEM_ID}}"},"tag":"{{TAG_ID}}"}',
       advancementTagPredicate: '{"tag":"{{TAG_ID}}","item":"{{ITEM_ID}}"}',
+      itemModelHandheld: '{"parent":"minecraft:item/handheld","textures":{"layer0":"{{namespace}}:item/{{REG_NAME}}"},"id":"{{REG_NAME}}"}',
+      blockModelColumn: '{"parent":"minecraft:block/cube_column","textures":{"end": "{{namespace}}:block/{{REG_NAME}}","side": "{{namespace}}:block/{{REG_NAME}}"},"id":"{{REG_NAME}}"}',
     },
     contentPaths: {
       itemModel: "src/main/resources/assets/{{namespace}}/models/item/{{id}}.json",

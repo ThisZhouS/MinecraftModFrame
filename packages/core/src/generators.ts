@@ -90,6 +90,16 @@ export function buildVars(spec: ModSpecT, adapter: AdapterRecordT): Record<strin
     clientEntrypointJson: clientEntrypoint === "" ? "" : JSON.stringify(clientEntrypoint),
     datagenEntrypoint,
     datagenEntrypointJson: datagenEntrypoint === "" ? "" : JSON.stringify(datagenEntrypoint),
+    // The generated project's README must not tell users to hand-draw art the generator just painted.
+    TEXTURE_NOTES: spec.textures
+      ? "## Textures\n\nGenerated as 16x16 PNGs (64x32 for entities) under `src/main/resources/assets/" +
+        ns +
+        "/textures/{item,block,entity}/`. They are managed files: to change the art, edit the ModSpec\n(`texture: { style, palette, seed }`) and regenerate - do not edit the PNGs by hand."
+      : "## Textures (not generated)\n\nModels reference these 16x16 PNG files - add them before shipping,\notherwise the game shows the missing-texture placeholder:\n\n- src/main/resources/assets/" +
+        ns +
+        "/textures/item/<item id>.png\n- src/main/resources/assets/" +
+        ns +
+        "/textures/block/<block id>.png",
     mainClassSimpleName: adapter.mainClassSimpleName,
     mainClassFq: `${packageName}.${adapter.mainClassSimpleName}`,
     ...gradleVars,
@@ -132,9 +142,20 @@ function genItems(ctx: GenContext): ItemGenOut {
       out.tabEntries.push(renderTemplate(ctx.adapter.templates.tabEntryLineItem!, { ...v }, "tabEntryLineItem"));
     }
     out.itemRegistrations.push(registration);
+    // Model shape is a spec choice; the JSON body itself is adapter data, so a version that changes
+    // the parent model only needs a data edit. Adapters without the variant get a fixable error.
+    const itemModelKey = item.model === "handheld" ? "itemModelHandheld" : "itemModel";
+    const itemModelTpl = ctx.adapter.templates[itemModelKey];
+    if (itemModelTpl === undefined) {
+      throw new McmodError(
+        "ADAPTER_INVALID",
+        `Adapter ${ctx.adapter.id} does not offer item model "${item.model}"; use "generated" or pick an adapter that ships the "${itemModelKey}" template`,
+        { adapterId: ctx.adapter.id, templateKey: itemModelKey, item: item.id },
+      );
+    }
     out.files.push({
       path: renderPath(ctx.adapter.contentPaths.itemModel, v, "contentPaths.itemModel"),
-      content: renderTemplate(ctx.adapter.templates.itemModel!, v, "itemModel"),
+      content: renderTemplate(itemModelTpl, v, itemModelKey),
       managed: true, executable: false, reason: `item:${item.id}:model`,
     });
     out.langEntries[renderTemplate(ctx.adapter.langKeys.item, { namespace: ctx.vars.namespace!, id: item.id }, "langKeys.item")] = display;
@@ -162,6 +183,15 @@ function genBlocks(ctx: GenContext): BlockGenOut {
       { ...v, HARDNESS: String(block.hardness), RESISTANCE: String(block.resistance), tool: block.tool },
       settingsKey,
     );
+    const blockModelKey = block.model === "cube_column" ? "blockModelColumn" : "blockModel";
+    const blockModelTpl = ctx.adapter.templates[blockModelKey];
+    if (blockModelTpl === undefined) {
+      throw new McmodError(
+        "ADAPTER_INVALID",
+        `Adapter ${ctx.adapter.id} does not offer block model "${block.model}"; use "cube_all" or pick an adapter that ships the "${blockModelKey}" template`,
+        { adapterId: ctx.adapter.id, templateKey: blockModelKey, block: block.id },
+      );
+    }
     out.blockRegistrations.push(renderTemplate(ctx.adapter.templates.blockRegistration!, { ...v, SETTINGS: settings }, "blockRegistration"));
     out.tabEntries.push(renderTemplate(ctx.adapter.templates.tabEntryLineBlock!, { ...v }, "tabEntryLineBlock"));
     out.files.push(
@@ -172,7 +202,7 @@ function genBlocks(ctx: GenContext): BlockGenOut {
       },
       {
         path: renderPath(ctx.adapter.contentPaths.blockModel, v, "contentPaths.blockModel"),
-        content: renderTemplate(ctx.adapter.templates.blockModel!, v, "blockModel"),
+        content: renderTemplate(blockModelTpl, v, blockModelKey),
         managed: true, executable: false, reason: `block:${block.id}:model`,
       },
       {

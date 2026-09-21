@@ -5,6 +5,7 @@
 ## 内容
 
 - `packages/core/test/fixture-adapter.ts`
+- `packages/core/test/models.test.ts` - symbols: modelBody, planFor
 - `packages/core/test/pipeline.test.ts` - symbols: parseSpecOrThrow, plan
 - `packages/core/test/texture.test.ts` - symbols: decodePng
 - `packages/core/test/unit.test.ts`
