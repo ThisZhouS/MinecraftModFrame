@@ -195,7 +195,7 @@ Spec 里一段声明：
 | 引用链路 | 模型/渲染器引用与落盘路径实测对应：`layer0: examplemod:item/ruby` → `textures/item/ruby.png`；`all: examplemod:block/ruby_ore` → `textures/block/ruby_ore.png`；渲染器 `textures/entity/ruby_golem.png` → 同名文件 |
 | 确定性 | 同 Spec 重生成**逐字节一致**（`diff -r` 全等）——seeded mulberry32，无 `Math.random` |
 | 开关关闭时零残留 | `textures:false` ⇒ 45 → 40 个文件，差集恰为 5 个 PNG |
-| 多版本 | Forge 1.20.1 同一 Spec 生成同样 5 个 PNG，落盘路径与引用链路同样对应（生成级验证；编译级见 §5） |
+| 多版本 | **三个适配器全覆盖**：Forge 1.20.1 与 NeoForge 1.21.1 用同一 Spec（含 handheld/cube_column）生成同样 5 个 PNG、45 个文件，落盘路径与引用链路同样对应（生成级验证；Fabric 编译级见上表） |
 | 测试 | core 38 项通过（含 PNG 往返编解码、确定性、配色、开关、非法风格字段级报错） |
 | **明确未做** | **贴图在游戏内的实际观感未验证**（无客户端运行）；实体贴图为 64×32 **纯色占位**，自定义 UV 美术仍需自备；未接真实图像模型（`paintTexture` 是预留的单一替换点） |
 
