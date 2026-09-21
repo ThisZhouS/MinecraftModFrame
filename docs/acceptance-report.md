@@ -196,7 +196,8 @@ Spec 里一段声明：
 | 确定性 | 同 Spec 重生成**逐字节一致**（`diff -r` 全等）——seeded mulberry32，无 `Math.random` |
 | 开关关闭时零残留 | `textures:false` ⇒ 45 → 40 个文件，差集恰为 5 个 PNG |
 | 多版本 | **三个适配器全覆盖**：Forge 1.20.1 与 NeoForge 1.21.1 用同一 Spec（含 handheld/cube_column）生成同样 5 个 PNG、45 个文件，落盘路径与引用链路同样对应（生成级验证；Fabric 编译级见上表） |
-| 测试 | core 38 项通过（含 PNG 往返编解码、确定性、配色、开关、非法风格字段级报错） |
+| 测试 | core 43 项通过（含 PNG 往返编解码、确定性、配色、开关、非法风格字段级报错） |
+| MCP 面 | `scripts/mcp-smoke.mjs` 以宿主方式握手实测：5 个工具齐全、`list_versions` 返回 3 个适配器、`scaffold_mod`（textures + handheld + cube_column）干跑 ok，23 文件、2 个 PNG 路径正确 |
 | **明确未做** | **贴图在游戏内的实际观感未验证**（无客户端运行）；实体贴图为 64×32 **纯色占位**，自定义 UV 美术仍需自备；未接真实图像模型（`paintTexture` 是预留的单一替换点） |
 
 设计取舍：贴图走**参数化程序化绘制**而非调用图像模型——离线、瞬时、**可复现**。可复现是关键：改图会体现为 diff，而不是不可复现的噪声；接真实模型只需替换 `paintTexture` 一个函数。

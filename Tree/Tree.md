@@ -95,6 +95,7 @@ MCMOD/
 |-- Prompt
 |   `-- 2026-09-15-项目启动-理念.md
 |-- scripts
+|   |-- mcp-smoke.mjs
 |   |-- update_tree.py
 |   `-- verify-build.mjs
 |-- Tree

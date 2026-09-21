@@ -203,6 +203,8 @@ Claude Code：`claude mcp add mcmodkit -- node E:/MCMOD/packages/mcp-server/dist
 
 任何 stdio MCP 客户端（含 DeepSeek Harness）都能用同一份配置接入，因为服务端只依赖标准输入输出，不绑定特定宿主。
 
+自检：`node scripts/mcp-smoke.mjs` 会像宿主一样起服务、握手、列工具，并用一份开了贴图与模型形态的 Spec 跑一次 `scaffold_mod` 干跑，确认产物路径正确。
+
 ### 智能体典型调用序列
 
 ```
