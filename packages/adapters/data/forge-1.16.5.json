@@ -1,0 +1,205 @@
+{
+  "id": "forge-1.16.5",
+  "mcVersion": "1.16.5",
+  "loader": "forge",
+  "loaderVersion": "36.2.42",
+  "java": 8,
+  "mappings": "MCP (ForgeGradle channel 'official' still yields MCP names on this version)",
+  "basePackagePattern": "com.{{modId}}",
+  "mainClassSimpleName": "ModMain",
+  "gradleWrapperVersion": "8.8",
+  "gradle": {
+    "forgeGradleVersion": "6.0.54",
+    "forgeVersion": "36.2.42",
+    "loaderVersionRange": "[36,)",
+    "minecraftVersionRange": "[1.16.5,1.17)",
+    "packFormat": 6
+  },
+  "vanillaGroups": {
+    "building_blocks": "ItemGroup.TAB_BUILDING_BLOCKS",
+    "redstone_blocks": "ItemGroup.TAB_REDSTONE",
+    "tools": "ItemGroup.TAB_TOOLS",
+    "combat": "ItemGroup.TAB_COMBAT",
+    "food_and_drinks": "ItemGroup.TAB_FOOD",
+    "ingredients": "ItemGroup.TAB_MATERIALS"
+  },
+  "assetFiles": [
+    {
+      "path": "gradlew",
+      "asset": "gradle-8.8/gradlew"
+    },
+    {
+      "path": "gradlew.bat",
+      "asset": "gradle-8.8/gradlew.bat"
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.jar",
+      "asset": "gradle-8.8/gradle/wrapper/gradle-wrapper.jar"
+    }
+  ],
+  "projectFiles": [
+    {
+      "path": "settings.gradle",
+      "template": "settingsGradle",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "build.gradle",
+      "template": "buildGradle",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "gradle.properties",
+      "template": "gradleProps",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.properties",
+      "template": "wrapperProps",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": ".gitignore",
+      "template": "gitignore",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "README.md",
+      "template": "projectReadme",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "src/main/resources/META-INF/mods.toml",
+      "template": "modsToml",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "src/main/resources/pack.mcmeta",
+      "template": "packMcmeta",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "src/main/java/{{packagePath}}/{{mainClassSimpleName}}.java",
+      "template": "mainClass",
+      "managed": true,
+      "executable": false
+    }
+  ],
+  "templates": {
+    "settingsGradle": "pluginManagement {\n\trepositories {\n\t\tgradlePluginPortal()\n\t\tmaven {\n\t\t\tname = 'MinecraftForge'\n\t\t\turl = 'https://maven.minecraftforge.net/'\n\t\t}\n\t}\n}\n\nrootProject.name = '{{modId}}'\n",
+    "buildGradle": "plugins {\n\tid 'eclipse'\n\tid 'idea'\n\tid 'net.minecraftforge.gradle' version '{{gradle_forgeGradleVersion}}'\n}\n\nversion = mod_version\ngroup = mod_group_id\n\nbase {\n\tarchivesName = mod_id\n}\n\n// On this Minecraft version line Mojang ships Java 17 to end users, so the mod targets Java 17.\njava.toolchain.languageVersion = JavaLanguageVersion.of({{javaVersion}})\n\nminecraft {\n\tmappings channel: mapping_channel, version: mapping_version\n\tcopyIdeResources = true\n\n\truns {\n\t\tconfigureEach {\n\t\t\tworkingDirectory project.file('run')\n\t\t\tproperty 'forge.logging.console.level', 'debug'\n\t\t\tmods {\n\t\t\t\t\"${mod_id}\" {\n\t\t\t\t\tsource sourceSets.main\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t\tclient {\n\t\t}\n\t\tserver {\n\t\t\targs '--nogui'\n\t\t}\n\t}\n}\n\n// ForgeGradle adds the Forge maven and Maven Central automatically.\nrepositories {\n}\n\ndependencies {\n\tminecraft \"net.minecraftforge:forge:${minecraft_version}-${forge_version}\"\n}\n\ntasks.named('jar', Jar).configure {\n\tmanifest {\n\t\tattributes(\n\t\t\t\t'Specification-Title'     : mod_id,\n\t\t\t\t'Specification-Vendor'    : mod_authors,\n\t\t\t\t'Specification-Version'   : '1',\n\t\t\t\t'Implementation-Title'    : project.name,\n\t\t\t\t'Implementation-Version'  : project.jar.archiveVersion,\n\t\t\t\t'Implementation-Vendor'   : mod_authors,\n\t\t)\n\t}\n\tfinalizedBy 'reobfJar'\n}\n\ntasks.withType(JavaCompile).configureEach {\n\toptions.encoding = 'UTF-8'\n}\n\n{{DATAGEN_RUN_CONFIG}}\n",
+    "gradleProps": "# Gradle\norg.gradle.jvmargs=-Xmx2G\norg.gradle.parallel=true\n# ForgeGradle 6 is not compatible with Gradle 9; keep the 8.x wrapper.\norg.gradle.configuration-cache=false\n\n# Forge builds for this Minecraft version line: https://files.minecraftforge.net/net/minecraftforge/forge/\nminecraft_version={{mcVersion}}\nforge_version={{gradle_forgeVersion}}\nmapping_channel=official\nmapping_version={{mcVersion}}\n\n# Mod properties\nmod_id={{modId}}\nmod_name={{modName}}\nmod_license={{license}}\nmod_version={{modVersion}}\nmod_group_id={{packageName}}\nmod_authors={{authors}}\nmod_description={{description}}\n",
+    "wrapperProps": "distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-{{gradleWrapperVersion}}-bin.zip\nnetworkTimeout=10000\nvalidateDistributionUrl=true\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n",
+    "gitignore": ".gradle/\nbuild/\nrun/\nrun-data/\n.idea/\n*.iml\n",
+    "projectReadme": "# {{modName}}\n\nMinecraft {{mcVersion}} / Forge {{loaderVersion}} mod, generated by mcmodkit from a ModSpec.\n\n## Build\n\n```\ngradlew.bat build      # Windows\n./gradlew build        # macOS / Linux\n```\n\nThe mod jar is written to build/libs/. Requires JDK {{javaVersion}}; the bundled Gradle wrapper ({{gradleWrapperVersion}}) downloads dependencies on first run.\n\n{{TEXTURE_NOTES}}\n\n## Regenerating\n\nFiles listed in the mcmodkit plan are managed and overwritten on regeneration; anything else in this\nproject is never touched. Re-run `mcmod gen <spec.json> -o .` from the framework repository.\n",
+    "modsToml": "# Mod metadata for a MinecraftForge (FML) mod.\nmodLoader=\"javafml\"\nloaderVersion=\"{{gradle_loaderVersionRange}}\"\nlicense=\"{{license}}\"\n\n[[mods]]\nmodId=\"{{modId}}\"\nversion=\"{{modVersion}}\"\ndisplayName=\"{{modName}}\"\nauthors=\"{{authors}}\"\ndescription='''{{description}}'''\n\n[[dependencies.{{modId}}]]\nmodId=\"forge\"\nmandatory=true\nversionRange=\"[{{gradle_forgeVersion}},)\"\nordering=\"NONE\"\nside=\"BOTH\"\n\n[[dependencies.{{modId}}]]\nmodId=\"minecraft\"\nmandatory=true\nversionRange=\"{{gradle_minecraftVersionRange}}\"\nordering=\"NONE\"\nside=\"BOTH\"\n",
+    "packMcmeta": "{\n\t\"pack\": {\n\t\t\"pack_format\": {{gradle_packFormat}},\n\t\t\"description\": \"{{modName}}\"\n\t}\n}\n",
+    "mainClass": "package {{packageName}};\n\nimport net.minecraft.util.ResourceLocation;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport net.minecraftforge.fml.common.Mod;\nimport net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;\nimport org.apache.logging.log4j.LogManager;\nimport org.apache.logging.log4j.Logger;\n\n/** Entry point of {{modName}} (generated by mcmodkit). */\n@Mod({{mainClassSimpleName}}.MOD_ID)\npublic class {{mainClassSimpleName}} {\n\n\tpublic static final String MOD_ID = \"{{modId}}\";\n\tpublic static final Logger LOGGER = LogManager.getLogger(MOD_ID);\n\n\tpublic {{mainClassSimpleName}}() {\n\t\tIEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();\n\t\t{{mainClassSimpleName}}Items.register(modEventBus);\n\t\t{{mainClassSimpleName}}Blocks.register(modEventBus);\n{{REGISTRY_INIT_CALLS}}\n\t\tLOGGER.info(\"{} loaded\", MOD_ID);\n\t}\n\n\tpublic static ResourceLocation id(String path) {\n\t\treturn new ResourceLocation(MOD_ID, path);\n\t}\n}\n",
+    "itemsRegistryClass": "package {{packageName}};\n\nimport java.util.ArrayList;\nimport java.util.List;\nimport java.util.function.Supplier;\n\nimport net.minecraft.item.Item;\nimport net.minecraft.item.ItemGroup;\nimport net.minecraft.item.ItemStack;\nimport net.minecraft.item.Items;\nimport net.minecraft.util.IItemProvider;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport net.minecraftforge.fml.RegistryObject;\nimport net.minecraftforge.registries.DeferredRegister;\nimport net.minecraftforge.registries.ForgeRegistries;\n{{ITEM_BEHAVIOR_IMPORTS}}\n\n/** Items and creative tab of {{modName}} (generated by mcmodkit). */\npublic final class {{mainClassSimpleName}}Items {\n\n\tpublic static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, {{mainClassSimpleName}}.MOD_ID);\n\n\tprivate static final List<Supplier<? extends IItemProvider>> TAB_ENTRIES = new ArrayList<>();\n\n{{ITEM_REGISTRATIONS}}\n\n\tprivate {{mainClassSimpleName}}Items() {\n\t}\n\n\tpublic static void register(IEventBus modEventBus) {\n\t\tITEMS.register(modEventBus);\n{{TAB_BLOCK}}\n{{ITEM_GROUP_HOOKS}}\n\t}\n}\n",
+    "blocksRegistryClass": "package {{packageName}};\n\nimport net.minecraft.block.AbstractBlock;\nimport net.minecraft.block.Block;\nimport net.minecraft.block.material.Material;\nimport net.minecraft.item.BlockItem;\nimport net.minecraft.item.Item;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport net.minecraftforge.fml.RegistryObject;\nimport net.minecraftforge.registries.DeferredRegister;\nimport net.minecraftforge.registries.ForgeRegistries;\n\n/** Blocks of {{modName}} (generated by mcmodkit). Each block also gets a matching BlockItem. */\npublic final class {{mainClassSimpleName}}Blocks {\n\n\tpublic static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, {{mainClassSimpleName}}.MOD_ID);\n\n{{BLOCK_REGISTRATIONS}}\n\n\tprivate {{mainClassSimpleName}}Blocks() {\n\t}\n\n\tpublic static void register(IEventBus modEventBus) {\n\t\tBLOCKS.register(modEventBus);\n\t}\n}\n",
+    "itemRegistration": "\tpublic static final RegistryObject<Item> {{CONST_UPPER}} = ITEMS.register(\"{{REG_NAME}}\", () -> {{ITEM_CTOR}});",
+    "itemRegistrationGroup": "",
+    "itemSettings": "new Item.Properties(){{GROUP_SUFFIX}}{{DURABILITY_SUFFIX}}",
+    "itemSettingsMaxCount": "new Item.Properties().stacksTo({{MAX_COUNT}}){{GROUP_SUFFIX}}{{DURABILITY_SUFFIX}}",
+    "blockRegistration": "\tpublic static final RegistryObject<Block> {{CONST_UPPER}} = BLOCKS.register(\"{{REG_NAME}}\", () -> new Block({{SETTINGS}}));\n\tpublic static final RegistryObject<Item> {{CONST_UPPER}}_BLOCK_ITEM = {{mainClassSimpleName}}Items.ITEMS.register(\"{{REG_NAME}}\", () -> new BlockItem({{CONST_UPPER}}.get(), new Item.Properties()));",
+    "blockSettings": "AbstractBlock.Properties.of(Material.STONE).strength({{HARDNESS}}F, {{RESISTANCE}}F).requiresCorrectToolForDrops()",
+    "blockSettingsNoTool": "AbstractBlock.Properties.of(Material.STONE).strength({{HARDNESS}}F, {{RESISTANCE}}F)",
+    "tabBlock": "{{TAB_ENTRIES}}\n\t\tnew ItemGroup(\"{{namespace}}\") {\n\t\t\t@Override\n\t\t\tpublic ItemStack makeIcon() {\n\t\t\t\treturn TAB_ENTRIES.isEmpty() ? new ItemStack(Items.STONE) : new ItemStack(TAB_ENTRIES.get(0).get());\n\t\t\t}\n\t\t};",
+    "tabEntryLineItem": "\t\tTAB_ENTRIES.add({{mainClassSimpleName}}Items.{{CONST_UPPER}});",
+    "tabEntryLineBlock": "\t\tTAB_ENTRIES.add({{mainClassSimpleName}}Blocks.{{CONST_UPPER}});",
+    "blockState": "{\n\t\"variants\": {\n\t\t\"\": { \"model\": \"{{namespace}}:block/{{REG_NAME}}\" }\n\t}\n}\n",
+    "blockModel": "{\n\t\"parent\": \"minecraft:block/cube_all\",\n\t\"textures\": {\n\t\t\"all\": \"{{namespace}}:block/{{REG_NAME}}\"\n\t}\n}\n",
+    "blockItemModel": "{\n\t\"parent\": \"{{namespace}}:block/{{REG_NAME}}\"\n}\n",
+    "itemModel": "{\n\t\"parent\": \"minecraft:item/generated\",\n\t\"textures\": {\n\t\t\"layer0\": \"{{namespace}}:item/{{REG_NAME}}\"\n\t}\n}\n",
+    "lootTable": "{\n\t\"type\": \"minecraft:block\",\n\t\"pools\": [\n\t\t{\n\t\t\t\"rolls\": 1,\n\t\t\t\"bonus_rolls\": 0,\n\t\t\t\"entries\": [\n\t\t\t\t{\n\t\t\t\t\t\"type\": \"minecraft:item\",\n\t\t\t\t\t\"name\": \"{{namespace}}:{{REG_NAME}}\"\n\t\t\t\t}\n\t\t\t],\n\t\t\t\"conditions\": [\n\t\t\t\t{ \"condition\": \"minecraft:survives_explosion\" }\n\t\t\t]\n\t\t}\n\t]\n}\n",
+    "mineableTag": "{\n\t\"replace\": false,\n\t\"values\": [\n\t\t{{VALUES}}\n\t]\n}\n",
+    "itemModelHandheld": "{\n\t\"parent\": \"minecraft:item/handheld\",\n\t\"textures\": {\n\t\t\"layer0\": \"{{namespace}}:item/{{REG_NAME}}\"\n\t}\n}\n",
+    "blockModelColumn": "{\n\t\"parent\": \"minecraft:block/cube_column\",\n\t\"textures\": {\n\t\t\"end\": \"{{namespace}}:block/{{REG_NAME}}\",\n\t\t\"side\": \"{{namespace}}:block/{{REG_NAME}}\"\n\t}\n}\n",
+    "itemGroupSuffix": ".tab({{GROUP_EXPR}})"
+  },
+  "contentPaths": {
+    "itemModel": "src/main/resources/assets/{{namespace}}/models/item/{{id}}.json",
+    "blockState": "src/main/resources/assets/{{namespace}}/blockstates/{{id}}.json",
+    "blockModel": "src/main/resources/assets/{{namespace}}/models/block/{{id}}.json",
+    "blockItemModel": "src/main/resources/assets/{{namespace}}/models/item/{{id}}.json",
+    "lootTable": "src/main/resources/data/{{namespace}}/loot_tables/blocks/{{id}}.json",
+    "mineableTag": "src/main/resources/data/minecraft/tags/blocks/mineable/{{tool}}.json",
+    "lang": "src/main/resources/assets/{{namespace}}/lang/en_us.json",
+    "itemTexture": "src/main/resources/assets/{{namespace}}/textures/item/{{id}}.png",
+    "blockTexture": "src/main/resources/assets/{{namespace}}/textures/block/{{id}}.png",
+    "entityTexture": "src/main/resources/assets/{{namespace}}/textures/entity/{{id}}.png"
+  },
+  "langKeys": {
+    "item": "item.{{namespace}}.{{id}}",
+    "block": "block.{{namespace}}.{{id}}",
+    "itemGroup": "itemGroup.{{namespace}}"
+  },
+  "notes": [
+    "Forge 1.20.1 uses the pre-1.21 PLURAL datapack directories: data/<ns>/loot_tables/blocks/... and data/minecraft/tags/blocks/mineable/... The singular 1.21 names do not load here.",
+    "Mappings are Mojang official (channel 'official'); API names are mojmap (net.minecraft.world.item.Item), not MCP/yarn.",
+    "Mod metadata lives in src/main/resources/META-INF/mods.toml; the @Mod annotated class is discovered by scanning, so mods.toml does not name it.",
+    "Version facts: Forge 1.20.1 recommended 47.4.10 (files.minecraftforge.net promotions_slim.json), ForgeGradle 6.0.54, Gradle 8.8 wrapper as shipped by the official 47.4.10 MDK.",
+    "Textures are not generated: add 16x16 PNGs under assets/<ns>/textures/{item,block}/<id>.png.",
+    "Compile-verified trap: ItemLike is net.minecraft.world.level.ItemLike on 1.20.1 (verified with javap against the mapped Forge jar) and stays there on 1.21.1; net.minecraft.world.item.ItemLike does not exist on either version.",
+    "Compile-verified: ResourceLocation.fromNamespaceAndPath(namespace, path) exists in 1.20.1 and avoids the deprecated public ResourceLocation(String, String) constructor.",
+    "Registry lookups must not happen in register(): it runs from the mod constructor, before any RegisterEvent populates the DeferredRegister. TAB_ENTRIES therefore holds RegistryObject suppliers and resolves them lazily inside the creative-tab lambdas. Calling .get() there throws \"Registry Object not present: <ns>:<id>\" at load time.",
+    "Derived from forge-1.20.1, re-fitted with facts from scripts/version-facts.mjs (loader 36.2.42, pack_format 6 read from the real game jar).",
+    "SCOPE: items + blocks + textures only. UI/recipes/advancements/entities/datagen are deliberately absent because their templates are not version-independent (1.21.2+ alone changed MobRenderer's arity and EntityType.Builder#build). Asking for them fails with a clear error rather than emitting broken Java.",
+    "1.16.5 era: a custom creative tab is `new CreativeModeTab(label) { makeIcon() }`. Forge's patch adds that constructor (this(-1, label)) and addGroupSafe() expands TABS and stores the instance, so it self-registers and the reference can be discarded. The display name is built as \"itemGroup.\" + label.",
+    "1.16.5 era: there is no creative-tab registry (Registries.CREATIVE_MODE_TAB is 1.20+) and no BuildCreativeModeTabContentsEvent (1.19.4+), so a vanilla tab is selected at construction time with Item.Properties#tab() and the tab entries are plain suppliers resolved lazily by makeIcon().",
+    "1.16.5 era: CreativeModeTabs does not exist; the tabs are CreativeModeTab.TAB_* constants. BlockBehaviour.Properties.of() requires a Material.",
+    "com.mojang.logging.LogUtils is not in the 1.16.5 jar (1.17+); the mod class logs through org.apache.logging.log4j.LogManager. The @Mod class also takes a no-arg constructor and reaches the event bus through FMLJavaModLoadingContext.get() - constructor injection is much newer.",
+    "This version compiles against MCP names, NOT Mojang official names: net.minecraft.item.Item, net.minecraft.item.ItemGroup, net.minecraft.block.AbstractBlock, net.minecraft.block.material.Material, net.minecraft.util.ResourceLocation, net.minecraft.util.IItemProvider. ForgeGradle 6 with channel 'official' still emits MCP-named classes on 1.16.5 - verified with javap on the mapped jar it actually produces. Every other adapter in this repo uses Mojang names.",
+    "1.16.5 era: a custom creative tab is `new ItemGroup(label) { makeIcon() }`. Forge's patch adds that constructor (this(-1, label)) and addGroupSafe() grows TABS and stores the instance, so it self-registers and the reference can be discarded. The display name is built as \"itemGroup.\" + label.",
+    "1.16.5 era: no creative-tab registry (1.20+) and no BuildCreativeModeTabContentsEvent (1.19.4+), so a vanilla tab is chosen at construction with Item.Properties#tab() and tab entries are plain suppliers resolved lazily by makeIcon(). RegistryObject lives in net.minecraftforge.fml on this version (net.minecraftforge.registries.RegistryObject is 1.17+).",
+    "com.mojang.logging.LogUtils is not in the 1.16.5 jar (1.17+); the mod class logs through org.apache.logging.log4j.LogManager. The @Mod class takes a no-arg constructor and reaches the event bus through FMLJavaModLoadingContext.get() - constructor injection is much newer.",
+    "Requires Java 8; build facts (forge 36.2.42, pack_format 6) come from scripts/version-facts.mjs reading the Forge maven and the real game jar. ForgeGradle 6.0.54 with the Gradle 8.8 wrapper builds this version fine."
+  ],
+  "itemBehaviors": {
+    "plain": "new Item({{SETTINGS}})",
+    "fishing_rod": "new FishingRodItem({{SETTINGS}})"
+  },
+  "itemBehaviorImports": {
+    "fishing_rod": "net.minecraft.item.FishingRodItem"
+  },
+  "references": [
+    {
+      "label": "Forge 官方文档",
+      "url": "https://mcforge.readthedocs.io/en/latest/",
+      "kind": "official-docs",
+      "note": "权威来源：DeferredRegister、事件、数据生成"
+    },
+    {
+      "label": "ForgeGradle 6 迁移指南",
+      "url": "https://gist.github.com/ChampionAsh5357/98b08c117cb2057d8029a8919c378a4c",
+      "kind": "migration",
+      "note": "本适配器钉 Gradle 8.8 的原因（ForgeGradle 6 不兼容 Gradle 9）"
+    },
+    {
+      "label": "1.19.4 -> 1.20 迁移指南",
+      "url": "https://gist.github.com/ChampionAsh5357/cf818acc53ffea6f4387fe28c2977d56",
+      "kind": "migration",
+      "note": "ChampionAsh5357 逐版本迁移笔记，高版本同样适用"
+    },
+    {
+      "label": "Forge 官方下载",
+      "url": "https://files.minecraftforge.net/",
+      "kind": "official-docs",
+      "note": "核对 loaderVersion 与 MC 版本对应关系"
+    },
+    {
+      "label": "Linkie 映射表查询",
+      "url": "https://linkie.shedaniel.dev/mappings",
+      "kind": "mappings",
+      "note": "查 mojmap 对应名，写模板前核对签名"
+    }
+  ]
+}

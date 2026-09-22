@@ -45,9 +45,23 @@ MCP 工具**不执行任何 shell/构建命令**：构建由使用方自行决�
 
 | 适配器 | MC | 加载器 | Java | 状态 |
 | --- | --- | --- | --- | --- |
+| `fabric-1.16.5` | 1.16.5 | Fabric (loader 0.19.5) | 8 | ✅ **真编译通过**（产出 jar） |
+| `fabric-1.19.4` | 1.19.4 | Fabric (loader 0.19.5) | 17 | ✅ **真编译通过**（产出 jar） |
+| `fabric-1.20.4` | 1.20.4 | Fabric (loader 0.19.5) | 17 | ✅ **真编译通过**（产出 jar） |
 | `fabric-1.21.1` | 1.21.1 | Fabric (loader 0.19.5) | 21 | ✅ **真编译通过**（产出 jar） |
-| `neoforge-1.21.1` | 1.21.1 | NeoForge (21.1.250, ModDevGradle 2.0.147) | 21 | ⚠️ 已生成，**未编译验证**（本机网络无法访问 maven.neoforged.net；证据见验收报告 §8.1） |
+| `fabric-1.21.4` | 1.21.4 | Fabric (loader 0.19.5) | 21 | ✅ **真编译通过**（产出 jar） |
+| `forge-1.16.5` | 1.16.5 | Forge (36.2.42, ForgeGradle 6.0.54, Gradle 8.8) | 8 | ✅ **真编译通过**（产出 jar；该版本用 MCP 名，见下） |
+| `forge-1.19.4` | 1.19.4 | Forge (45.4.5, ForgeGradle 6.0.54, Gradle 8.8) | 17 | ✅ **真编译通过**（产出 jar） |
 | `forge-1.20.1` | 1.20.1 | Forge (47.4.10, ForgeGradle 6.0.54, Gradle 8.8) | 17 | ✅ **真编译通过**（产出经 reobfJar 的 jar） |
+| `forge-1.20.4` | 1.20.4 | Forge (49.2.9, ForgeGradle 6.0.54, Gradle 8.8) | 17 | ✅ **真编译通过**（产出 jar） |
+| `forge-1.21.4` | 1.21.4 | Forge (54.1.18, ForgeGradle 6.0.54, Gradle 8.8) | 21 | ✅ **真编译通过**（产出 jar） |
+| `neoforge-1.20.4` | 1.20.4 | NeoForge (ModDevGradle) | 17 | ⚠️ 已生成，**未编译验证**（见验收报告 §8.1） |
+| `neoforge-1.21.1` | 1.21.1 | NeoForge (21.1.250, ModDevGradle 2.0.147) | 21 | ⚠️ 已生成，**未编译验证**（本机网络无法访问 maven.neoforged.net） |
+| `neoforge-1.21.4` | 1.21.4 | NeoForge (ModDevGradle) | 21 | ⚠️ 已生成，**未编译验证**（见验收报告 §8.1） |
+
+**注意 `forge-1.16.5` 用的是 MCP 名**（`net.minecraft.item.Item`），其余目标用 Mojang 官方名——
+这不是笔误：ForgeGradle 在该版本产出的构件虽然叫 `..._mapped_official_1.16.5.jar`，内容却是 MCP 命名。
+判据一律是 `javap` 真实构件，不是构件名。详见 `docs/adding-a-version.md` §2.5。
 
 新增一个目标 = 新增 `packages/adapters/data/<loader>-<mcVersion>.json`（可用 `mcmod adapter <id> --templates` 参考现有适配器），无需改动引擎。
 

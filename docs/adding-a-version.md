@@ -100,44 +100,68 @@ cp packages/adapters/data/<loader>-<oldVersion>.json packages/adapters/data/<loa
 | 1.21.4 fabric/forge | 1.21.1 / 1.20.1 | ✅ 编译通过（少数构建事实差异） |
 | 1.20.4 fabric/forge | 1.21.1 / 1.20.1 | ✅ 编译通过（一处 `ResourceLocation` 差异） |
 | **1.19.4** | 1.20.4 | ✅ 编译通过（**按年代重写**后，见下） |
-| **1.16.5** | 1.19.4 | ❌ **未通过，适配器已移除** |
+| **1.16.5** fabric/forge | 1.19.4 | ✅ 编译通过（**整套模板按年代重写**，见下） |
 
-### 1.16.5：不是修几处，是整套重写
+### 1.16.5：不是修几处，是整套重写（两个加载器均已完成）
 
-由编译器列出的差异（尚未逐条取证，下次先做这一步）：
+派生仍然只是起点：编译器列出的差异覆盖主类、两个注册类、物品组 API、包名、日志。
 
-- `net.minecraft.core.registries` **包不存在**——1.16.5 是 `net.minecraft.core.Registry` / `BuiltInRegistries` 的前身。
-- Fabric 物品组 API 路径完全不同：不是 `net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup`，
-  而是 `net.fabricmc.fabric.api.client.itemgroup.FabricItemGroupBuilder`。
-- `org.slf4j` **不在编译类路径上**（旧 loom 不注入）——主类的日志导入要换。
-- 还有 1.13 前不存在的东西：`Item.Properties` 之前的构造方式、创造模式标签页是 `ItemGroup` 而非 `CreativeModeTab`。
+**最反直觉的一条：Forge 1.16.5 编译用的是 MCP 名字，不是 Mojang 官方名。**
+`mappings channel: 'official', version: '1.16.5'` 产出的构件名字里带 `_mapped_official_1.16.5`，
+但内容不是官方名。对那个构件 `javap` 实测：
 
-结论：1.16.5 需要**整套模板重写**（主类、两个注册类、物品组 API、包名、日志），
-而不是像 1.19.4 那样改 4 处。做法同样是**先 javap 取证再写**。
+```
+net.minecraft.item.Item implements net.minecraft.util.IItemProvider   ← 存在
+net.minecraft.block.AbstractBlock / net.minecraft.block.material.Material
+net.minecraft.item.ItemGroup / net.minecraft.util.ResourceLocation
+net.minecraft.world.item.Item                                        ← 不存在
+```
 
-### 1.16.5 取证的下一步（已确认的部分）
+所以 forge-1.16.5 的模板全用 MCP 名，适配器的 `mappings` 字段也如实标注——
+**不要因为构件名里有 "official" 就假定是官方名，要 javap 它。**
 
-- **Fabric API 模块名与版本格式都不一样**：1.16 时代是 `fabric-item-groups-v0`
-  （不是 `fabric-item-group-api-v1`），且版本号是**哈希形式**（`0.3.39+9244241690`），
-  **不带 MC 版本后缀**。因此不能靠版本号筛选，要读聚合器 `fabric-api-0.42.0+1.16.pom`
-  的 `<dependencyManagement>` 拿到该 MC 版本对应的确切模块版本。
-  同理，`version-facts.mjs` 目前按 `+<mc>` 后缀匹配 Fabric API 版本的做法，
-  对 1.16 及更早需要补一条「读聚合器 POM」的回退路径。
-- 其余待取证：1.16.5 的注册表类全名、日志方案（`org.slf4j` 不在类路径上，
-  该用 MC 自带的 log4j）、`AbstractBlock.Properties.of(Material)`、`ItemGroup` 自定义标签页。
+其余由编译器 / 字节码 / 构件实测抓出的点：
 
-1.19.4 / 1.16.5 的实测差异（由编译器抓出，逐条已核对）：
+- **两个加载器在这个版本都没有「注册后挂钩」**。Fabric 侧：聚合器 `fabric-api-0.42.0+1.16`
+  解析到的 `fabric-item-groups-v0` `0.3.1+3cc0f0907d` 里没有 `ItemGroupEvents`（`0.3.39` 线也没有，
+  `javap` 实测）。Forge 侧：`BuildCreativeModeTabContentsEvent` 是 1.19.4+。
+  两边的创造标签页都只能在**构造物品时**用 `Item.Properties#tab()` 绑定。
+- **标签页自身能自注册**，两边的证据都在字节码里：
+  Fabric 的 `CreativeModeTab.<init>` 末尾是 `TABS[id] = this`（`getstatic`/`iload_1`/`aload_0`/`aastore`），
+  这正是 `FabricItemGroupBuilder.build()` 先 `fabric_expandArray()` 再构造的意义；
+  Forge 的补丁（`forge-1.16.5-36.2.42-sources.jar` 里 `patches/net/minecraft/item/ItemGroup.java.patch`）
+  加了 `ItemGroup(String label)` → `addGroupSafe(-1, this)`，扩容 `TABS` 并写入。
+  所以 `build()` / `new ItemGroup(label){}` 之后可以丢弃返回值。
+- **翻译键不是自由可选的**：Fabric 的 builder 用 `String.format("%s.%s", namespace, path)`，
+  Forge 用 `"itemGroup." + label`。适配器要让 `langKeys.itemGroup` 和它生成键的方式对齐。
+- `net.minecraft.core.registries` 包不存在（1.19.3+ 才有）；Fabric 侧注册表是
+  `Registry.ITEM` / `Registry.BLOCK`，`CreativeModeTab` 仍是 `net.minecraft.world.item` 下的普通类。
+- `RegistryObject` 在 1.16.5 是 **`net.minecraftforge.fml.RegistryObject`**
+  （`...registries.RegistryObject` 是 1.17+）。
+- `com.mojang.logging.LogUtils` 不在 1.16.5 的 jar 里（1.17+）；`org.slf4j` 也不在 Fabric 侧编译类路径上。
+  两边都用 `org.apache.logging.log4j.LogManager`。
+- `@Mod` 类用**无参构造** + `FMLJavaModLoadingContext.get()`（构造器注入是后来才有的）。
+- `BlockBehaviour.Properties.of()` / `AbstractBlock.Properties.of()` 需要 `Material`（无参重载是 1.20+）。
+- 数据包目录是**复数**：`data/<ns>/loot_tables/`、`data/minecraft/tags/blocks/`。
+- **Java 8 目标不接受 `var`**：javac 报的是「找不到符号: 类 var」，和语言级别毫无关系，
+  而且只有真编译过的目标才会暴露。现在 lint 直接拦（`adapter.java < 10` 时任何模板出现 `var` 即报错）。
+- **ForgeGradle 6 能直接构建 1.16.5**（实测 6.0.54 + Gradle 8.8 wrapper），
+  不需要退回 ForgeGradle 3 / 老 Gradle。
+- **`version-facts.mjs` 的 `+<mc>` 后缀回落是对的**：1.16.5 的 Fabric API 写作 `0.42.0+1.16`，
+  按 major.minor 回落即可命中，无需读聚合器 POM。
+
+1.19.4 的实测差异（由编译器抓出，逐条已核对）：
 
 - **`Registries.CREATIVE_MODE_TAB` 不存在**。查 Mojang 官方映射表取证：1.19.4 命中 **0** 次，1.20.4 命中 2 次
   ⇒ **创造模式标签页成为注册表是 1.20 才有的**（我原先以为 1.19.3，是错的——编译器是对的）。
   这两个版本要各写一套该年代的自定义标签页代码。
 - **`BlockBehaviour.Properties.of()` 在 1.19.4 需要 `Material` 参数**，1.20+ 才是无参。
 - **`FabricItemGroup.builder()` 在 1.19.4 签名不同**。
-- 1.16.5 还额外没有：标签（1.13 才有）、战利品表目录约定、`Item.Properties`（1.13 才有）等。
 
 **处理方式：不发布。** 编译不过的适配器会产出**看起来对、实际是坏的**代码——这正是本项目要避免的失败模式，
-比「没有这个版本」更糟。所以它们被移除，而不是标注为「未验证」保留。（NeoForge 是例外：它生成正确、只是本机无法验证，
-性质不同。）
+比「没有这个版本」更糟。所以编译不过的一律移除，而不是标注为「未验证」保留。
+（NeoForge 是例外：它生成正确、只是本机无法验证，性质不同。）
+1.16.5 一度就是这样被移除的，直到整套模板按年代重写、真编译通过才重新发布。
 
 **下次要做的顺序**：先按该年代的官方文档/示例写 `tabBlock` 与 `blockSettings`，**逐条用 `javap` 或官方映射表核对**，
 再编译。不要指望派生脚本能跨代。

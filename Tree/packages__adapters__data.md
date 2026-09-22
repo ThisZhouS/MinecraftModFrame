@@ -4,10 +4,12 @@
 
 ## 内容
 
+- `packages/adapters/data/fabric-1.16.5.json`
 - `packages/adapters/data/fabric-1.19.4.json`
 - `packages/adapters/data/fabric-1.20.4.json`
 - `packages/adapters/data/fabric-1.21.1.json`
 - `packages/adapters/data/fabric-1.21.4.json`
+- `packages/adapters/data/forge-1.16.5.json`
 - `packages/adapters/data/forge-1.19.4.json`
 - `packages/adapters/data/forge-1.20.1.json`
 - `packages/adapters/data/forge-1.20.4.json`

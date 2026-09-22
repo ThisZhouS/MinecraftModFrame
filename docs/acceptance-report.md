@@ -266,3 +266,53 @@ node scripts/verify-build.mjs --adapter forge-1.20.1 \
 4. **贴图缺失**：物品/方块贴图需自备（生成工程 README 已明确）。
 5. **覆盖子集仍有限**：配方、进度、实体、附魔、datagen 尚未实现。
 6. **未做负面安全测试**：路径逃逸有实现级守卫与单测，但无模糊测试；MCP/HTTP 面未做鉴权（默认仅监听 loopback）。
+
+## 14. L4 真编译（四）：1.16.5（本轮新增，跨代际重写）
+
+### 14.1 命令与结果
+
+```bash
+node scripts/smoke-spec.mjs .probe116/spec-1165.json 1.16.5 fabric
+node packages/cli/dist/index.js gen .probe116/spec-1165.json -o .probe116/gen
+cd .probe116/gen/examplemod && <gradle-9.5.1>/bin/gradle build     # BUILD SUCCESSFUL, 25 files
+```
+```
+> Task :compileJava
+> Task :remapJar
+> Task :build
+BUILD SUCCESSFUL in 17s
+```
+
+```bash
+node scripts/smoke-spec.mjs .probe116/spec-1165-forge.json 1.16.5 forge
+node packages/cli/dist/index.js gen .probe116/spec-1165-forge.json -o .probe116/gen-forge
+cd .probe116/gen-forge/examplemod && <gradle-8.8>/bin/gradle build  # BUILD SUCCESSFUL
+```
+```
+> Task :compileJava
+> Task :reobfJar
+> Task :build
+BUILD SUCCESSFUL in 21s
+```
+
+### 14.2 由真编译/取证发现并修复的缺陷
+
+| 缺陷 | 发现方式 | 处理 |
+| --- | --- | --- |
+| `var id = ...` 在 Java 8 目标编译失败 | 编译器报「找不到符号: 类 var」 | 模板改用显式类型；**并加 lint**：`adapter.java < 10` 时任何模板出现 `var` 即报错 |
+| 1.16 没有 `ItemGroupEvents`，旧的组挂钩模板产出坏 Java | `javap` 该版本聚合器解析到的 `fabric-item-groups-v0` 构件 | 契约新增 `itemGroupSuffix`，改为构造期 `Item.Properties#tab()` |
+| Forge 1.16.5 编译用 MCP 名而非官方名 | 对 ForgeGradle 真实产出的 `_mapped_official_1.16.5.jar` 做 `javap` | 模板全量改用 MCP 名；`mappings` 字段如实标注 |
+| `RegistryObject` 包路径 | `javap` | 该版本是 `net.minecraftforge.fml.RegistryObject` |
+| `com.mojang.logging.LogUtils` 不存在 | 编译 + 查 jar 内容 | 改用 log4j |
+| 数据包目录复数 | 读真实 client.jar | `loot_tables/`、`tags/blocks/` |
+
+### 14.3 没做到的部分（如实标注）
+
+1. **运行期一律未验证**：两个 1.16.5 工程只做到「产出 jar」。自定义标签页是否真的出现在创造模式界面、
+   物品是否落在预期分页，**没有任何目标做过真机运行验证**（本机无可用图形客户端）。
+   间接证据是 `javap -c` 字节码（Fabric 的 `CreativeModeTab.<init>` 末尾 `TABS[id] = this`）
+   与 Forge 官方补丁源码（`addGroupSafe`），但那是**代码路径证据，不是运行证据**。
+2. **1.16.5 只覆盖 items + blocks + textures**：UI/配方/进度/实体/datagen 切片未移植（其模板不是版本无关的）。
+3. **Forge 1.16.5 的 MCP 命名是工具链行为，不是我们的选择**：若上游 ForgeGradle 改变该行为，
+   该适配器需重新取证。已写进 `notes` 与 `docs/adding-a-version.md` §2.5。
+4. **`fabric-datagen` entrypoint** 在 1.16 模板中被移除（该 entrypoint 是 1.17+）。

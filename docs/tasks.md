@@ -150,3 +150,21 @@ java.lang.NullPointerException: Registry Object not present: mk2:mk2
 | 首次构建需联网（Gradle/Loom/Minecraft） | 离线环境无法构建 | 生成阶段零网络；README 明示首次构建需联网；wrapper 随工程分发 |
 | 本机 Java 对部分 CDN 直连不稳定 | wrapper 自动下载发行版可能失败 | 验收使用本地已解压的 Gradle 发行版；把该环境限制写入 docs/environment.md |
 | 适配器 schema 演进 | 旧数据失效 | `schemaVersion` + 加载期校验与可读报错 |
+
+## S16 交付物（多版本推进：13 个目标 / 10 个编译验证，已完成）
+
+**动机**：把框架从「一个能跑的版本」推进到「覆盖跨代际的版本」，并且**每一代都用真编译而不是记忆来定版**。
+
+- 新增目标：`1.19.4`、`1.20.4`、`1.21.4`（fabric+forge）、`1.21.1` fabric、`1.16.5`（fabric+forge），
+  加上原有 `fabric-1.21.1` / `forge-1.20.1` / 三个 neoforge ⇒ 共 13 个适配器，**10 个真编译通过**。
+- `scripts/version-facts.mjs`：从权威端点取构建事实（Fabric meta/maven、Forge maven、NeoForge maven 带镜像回落、
+  `pack_format` 读真实游戏 jar 的 `pack.mcmeta`）。已修两个静默错误：Forge 元数据降序导致取到最旧版、
+  Fabric API `+1.16` 需要 major.minor 回落。
+- `scripts/derive-adapter.mjs`：同代派生。**刻意不自动化语义差异**（那正是适配器要记录的），默认剥离可选切片。
+- **代际边界**（实测）：同代派生 + 少量修正可通过；跨代（1.19.4→1.16.5）必须整套模板重写。
+- 1.16.5 是本轮最重的一块，两个加载器的差异都已逐条取证并写进 `notes` 与 `docs/adding-a-version.md` §2.5：
+  两边都没有「注册后挂钩」、标签页靠构造期自注册、Forge 侧**该版本编译用 MCP 名而非官方名**。
+- 契约新增 `itemGroupSuffix`（可选）：旧版在构造物品时绑定标签页（`Item.Properties#tab`），
+  新版在注册后挂钩（`ItemGroupEvents`）。哪一种是适配器数据，引擎不做版本分支。
+- lint 新增 `var` 检查：Java 10 以下目标出现 `var` 直接报错——javac 把它报成「找不到符号: 类 var」。
+- 验收：109 项测试通过；`fabric-1.16.5` 与 `forge-1.16.5` 生成工程均 **BUILD SUCCESSFUL** 并产出 jar。
