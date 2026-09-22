@@ -25,6 +25,29 @@
 - `packages/api`：`node:http` JSON API（`/api/versions`、`/api/validate`、`/api/generate` 等）。
 - 测试分布：core 14、adapters 10、cli 4、mcp-server 6、api 6。
 
+## S14 交付物（运行期缺陷修复：Forge 创造模式标签页，已完成）
+
+**背景**：把 MK2 钓鱼竿装进真实 Forge 1.20.1 客户端启动，崩溃：
+
+```
+java.lang.NullPointerException: Registry Object not present: mk2:mk2
+    at com.mk2.ModMainItems.register(ModMainItems.java:38)
+```
+
+**根因**：Forge 适配器的 `tabEntryLineItem/Block` 生成 `TAB_ENTRIES.add(...MK2.get())`，而这行落在 `register()` 里——它由 mod 构造器调用，**早于任何 RegisterEvent**。`DeferredRegister` 此时还没填充，`.get()` 必然抛错。**编译完全无法发现**：这正是本仓库一直标注的「运行期行为未验证」缺口。
+
+**为什么只有 Forge 中招**：Fabric 的 `Registry.register` 是立即注册（列表存的是 Item 本身，正确）；NeoForge 的模板早已是 `List<Supplier<? extends ItemLike>>` 且惰性解析（正确）；只有 Forge 写成了即时 `.get()`。三个适配器里唯一写错的那个，恰好是唯一做过真机验证的那个。
+
+**修复**：Forge 改为与 NeoForge 同构——`TAB_ENTRIES` 存 `Supplier<? extends ItemLike>`（`RegistryObject` 本身就是 Supplier），在创造模式标签页的 lambda 里惰性 `.get()`。
+
+**防回归**：lint 新增规则——`tabEntryLineItem/tabEntryLineBlock` 不得含 `.get()`（这类行必然被发射进 `register()`，在那里查注册表**永远是错的**，与加载器无关）。2 项单测钉住正反两例。
+
+**运行期验收**（`gradlew runServer`，无 GUI 也能走完构造+注册）：
+- 日志出现 `[co.mk.ModMain/]: mk2 loaded`——该行位于 `ModMainItems.register()` **之后**，证明构造期注册全部走通。
+- 全程 `grep -i "error\|exception\|crash\|not present"` 无任何 mk2/ModMain 命中。
+- 服务器越过注册阶段并进入世界生成（`Preparing spawn area: 42%`）。
+- 同一份 mod、同一台机器：修复前必崩于构造期，修复后正常加载。
+
 ## S13 交付物（真实图像模型 + 物品行为，已完成）
 
 **真实图像模型（AI 生图）**：`textureProvider: "image-api"` + 内容级 `texture.prompt` / `texture.size`。

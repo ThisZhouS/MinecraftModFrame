@@ -43,6 +43,26 @@ describe("lintAdapter", () => {
     expect(problems).toMatch(/missing required template "blockState"/);
     expect(problems).toMatch(/tabEntryLineItem/);
   });
+  // Regression: the Forge adapter used to emit `TAB_ENTRIES.add(ModMainItems.RUBY.get())` into
+  // register(), which runs from the mod constructor. Compilation is happy; the game dies at load
+  // with "Registry Object not present". Lint now refuses that shape outright.
+  it("rejects a tab-entry line that resolves a registry entry during mod construction", () => {
+    const a = makeFixtureAdapter();
+    a.templates.tabEntryLineItem = "TAB_ENTRIES.add(ModMainItems.{{CONST_UPPER}}.get());";
+    expect(lintAdapter(a).join("\n")).toMatch(/tabEntryLineItem.*during mod construction/s);
+
+    const b = makeFixtureAdapter();
+    b.templates.tabEntryLineBlock = "TAB_ENTRIES.add(ModMainBlocks.{{CONST_UPPER}}.get());";
+    expect(lintAdapter(b).join("\n")).toMatch(/tabEntryLineBlock.*during mod construction/s);
+  });
+
+  it("accepts a tab-entry line that defers resolution to a supplier", () => {
+    const a = makeFixtureAdapter();
+    a.templates.tabEntryLineItem = "TAB_ENTRIES.add(ModMainItems.{{CONST_UPPER}});";
+    a.templates.tabEntryLineBlock = "TAB_ENTRIES.add(ModMainBlocks.{{CONST_UPPER}});";
+    expect(lintAdapter(a)).toEqual([]);
+  });
+
   it("rejects half-implemented screen support", () => {
     const a = makeFixtureAdapter();
     delete (a.templates as Record<string, unknown>).keybindRegister;

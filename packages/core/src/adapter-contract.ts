@@ -388,6 +388,20 @@ export function lintAdapter(a: AdapterRecordT): string[] {
       if (!body.includes(ph)) problems.push(`template "${key}" must use ${ph}`);
     }
   }
+  // Tab-entry lines are emitted into register(), which runs from the mod constructor — before any
+  // RegisterEvent has populated a DeferredRegister. Resolving a registry entry there throws
+  // "Registry Object not present" at load time, and compilation cannot catch it: the bug only shows
+  // up when the game actually starts. Add the deferred holder itself (it is a Supplier) and let the
+  // creative-tab lambda resolve it later.
+  for (const key of ["tabEntryLineItem", "tabEntryLineBlock"] as const) {
+    const body = a.templates[key];
+    if (body !== undefined && /\.get\(\)/.test(body)) {
+      problems.push(
+        `template "${key}" resolves a registry entry during mod construction (.get()); ` +
+          `add the deferred holder itself and resolve it lazily in the tab, or the mod throws "Registry Object not present" at load time`,
+      );
+    }
+  }
   // Every item must be constructible: without "plain" a spec that names no behaviour cannot build.
   if (a.itemBehaviors.plain === undefined) {
     problems.push('itemBehaviors must define "plain" (the default item constructor)');
