@@ -38,7 +38,47 @@ node packages/cli/dist/index.js adapter forge-1.20.1 --json   # 人 / 脚本
 
 **判断标准**：任何「我记得是这样」的版本事实，都必须落到上面某一种证据上，否则写进 `notes` 时标注为未取证。
 
+## 1.5 取构建事实（工具化，不必手查）
+
+```bash
+node scripts/version-facts.mjs 1.21.4 fabric --pack-format   # 单个目标
+node scripts/version-facts.mjs --all --pack-format            # 全部目标
+```
+
+从权威端点读，**不靠记忆**：Fabric meta/maven（loader、loom、fabric-api）、Forge maven、
+NeoForge maven（官方不可达时自动走 creeperhost 镜像）、`pack_format` 读**真实游戏 jar 的
+`pack.mcmeta`**（比 `version.json` 更直接，也是 1.16.5 及更早唯一可得的来源）。
+
+两个已踩过的坑，脚本里已处理：
+
+- **Forge 版本排序**：元数据是**降序**的，且 `"1.16.5-36.2.42"` 按整串切分会让 `Number("5-36")` = `NaN`，
+  排序静默失效、取到**最旧**版。必须只比较 `<mc>-` 之后的部分。
+- **Fabric API 后缀**：1.16.5 写作 `0.42.0+1.16` 而非 `+1.16.5`，需要按 major.minor 回落匹配。
+
 ## 2. 复制一份现有适配器
+
+机械部分可以直接派生（**但派生只是起点，不是正确性声明**）：
+
+```bash
+node scripts/derive-adapter.mjs <源适配器id> <mcVersion> <loader>
+# 例：node scripts/derive-adapter.mjs fabric-1.21.1 1.21.4 fabric
+```
+
+派生脚本**刻意不自动化语义**（版本间的 API 变更）——那正是适配器要记录、编译器要抓的东西。
+它默认**剥离可选切片**（UI/配方/进度/实体/datagen），因为这些模板**不是版本无关的**：
+1.21.2 起 `MobRenderer` 多了一个类型变量、`EntityType.Builder#build` 改收 `ResourceKey`，
+照抄 1.21.1 的实体模板在 1.21.4 上根本编译不过。保留陈旧模板会产出坏 Java；剥离后生成器会
+给出「该适配器不支持 entities」的明确报错。
+
+**另有两个由真机编译抓出的坑，务必注意：**
+
+- **loom 要按代际选，不能取「最新」**：loom 1.18.2 要求 **JVM 25**，Java 21 的目标根本装不上；
+  loom 1.17.21 又要求 **Gradle 9.5.0**，用 8.8 会因 `org.gradle.plugin.api-version` 不匹配失败。
+  所以派生时**继承同代源适配器的 loom**，而不是用「最新稳定版」。
+- **Forge 1.20.2+ 取消了 reobfuscation**：`reobfJar` 任务不存在，`finalizedBy 'reobfJar'` 会让构建失败，必须删掉。
+- **NeoForge 的仓库顺序要紧**：官方 maven 在被阻断的网络上返回 `Connection reset by peer`，这是**硬失败而非回落**。
+  它若排在 `gradlePluginPortal()` 之前，传递依赖（如 `gradle-idea-ext`）就永远解析不到。正确顺序是
+  **镜像 → 公共仓库 → 官方 maven 放最后**。
 
 ```bash
 cp packages/adapters/data/<loader>-<oldVersion>.json packages/adapters/data/<loader>-<newVersion>.json

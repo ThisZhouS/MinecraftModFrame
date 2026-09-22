@@ -109,7 +109,9 @@ MCMOD/
 |-- Prompt
 |   `-- 2026-09-15-项目启动-理念.md
 |-- scripts
+|   |-- derive-adapter.mjs
 |   |-- mcp-smoke.mjs
+|   |-- smoke-spec.mjs
 |   |-- update_tree.py
 |   |-- verify-build.mjs
 |   `-- version-facts.mjs

@@ -17,7 +17,7 @@ import { execFileSync } from "node:child_process";
  */
 const [srcId, mc, loader, ...flags] = process.argv.slice(2);
 if (!srcId || !mc || !loader) {
-  console.error("usage: node .derive.mjs <sourceAdapterId> <mcVersion> <loader> [--keep-optional]");
+  console.error("usage: node scripts/derive-adapter.mjs <sourceAdapterId> <mcVersion> <loader> [--keep-optional]");
   process.exit(2);
 }
 const keepOptional = flags.includes("--keep-optional");
