@@ -5,4 +5,4 @@
 ## 内容
 
 - `packages/adapters/test/loader.test.ts`
-- `packages/adapters/test/real-adapter.test.ts`
+- `packages/adapters/test/real-adapter.test.ts` - symbols: declares, specFor

@@ -7,6 +7,33 @@ const adapter = requireAdapter("1.21.1", "fabric");
 const plan = planProject(spec, adapter);
 const paths = plan.files.map((f) => f.path);
 
+/**
+ * Adapters may legitimately carry only a subset of the slices: UI/recipes/advancements/entities/
+ * datagen are all-or-nothing, and the lint enforces that. A slice's templates are not
+ * version-independent — 1.21.2 alone changed MobRenderer's type-variable arity and made
+ * EntityType.Builder#build take a ResourceKey — so a newly added version starts without them and
+ * gains them as each is ported and compile-verified.
+ *
+ * These tests therefore drive each adapter with a spec trimmed to what it actually declares, and a
+ * separate test below pins that asking for an undeclared slice fails loudly instead of emitting
+ * broken Java.
+ */
+function declares(a: ReturnType<typeof listAdapters>[number], key: string): boolean {
+  return (a.templates as Record<string, string>)[key] !== undefined;
+}
+
+function specFor(a: ReturnType<typeof listAdapters>[number]) {
+  const s = structuredClone(spec);
+  if (!declares(a, "screenClass")) s.ui = { screens: [] };
+  if (!declares(a, "recipeShaped")) s.content.recipes = [];
+  if (!declares(a, "advancement")) s.content.advancements = [];
+  if (!declares(a, "entityClass")) s.content.entities = [];
+  if (!declares(a, "dataGenClass")) s.datagen = false;
+  return s;
+}
+
+const planFor = (a: ReturnType<typeof listAdapters>[number]) => (a.id === adapter.id ? plan : planProject(specFor(a), a));
+
 describe("fabric-1.21.1 adapter", () => {
   it("ships a runnable gradle wrapper as binary assets", () => {
     const jar = plan.files.find((f) => f.path === "gradle/wrapper/gradle-wrapper.jar");
@@ -64,7 +91,7 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
     // This is the strongest check available for adapters that cannot be compile-verified on this
     // machine: a template/vars mismatch shows up as a literal {{placeholder}} in emitted code.
     for (const a of listAdapters()) {
-      const p = a.id === adapter.id ? plan : planProject(spec, a);
+      const p = planFor(a);
       expect(p.files.length).toBeGreaterThan(20);
       for (const f of p.files) {
         const leftover = f.content.match(/\{\{[a-zA-Z_]+\}\}/g);
@@ -73,9 +100,9 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
     }
   });
 
-  it("every adapter generates the UI slice from the example spec", () => {
-    for (const a of listAdapters()) {
-      const p = a.id === adapter.id ? plan : planProject(spec, a);
+  it("generates the UI slice for every adapter that declares it", () => {
+    for (const a of listAdapters().filter((x) => declares(x, "screenClass"))) {
+      const p = planFor(a);
       const paths = p.files.map((f) => f.path);
       expect(paths, `${a.id} should emit a client bootstrap`).toContain("src/main/java/com/examplemod/client/ModMainClient.java");
       expect(paths, `${a.id} should emit the screen class`).toContain("src/main/java/com/examplemod/client/ModMainGuideScreen.java");
@@ -125,8 +152,8 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
   });
 
   it("uses the version's own datapack directory names for every data file", () => {
-    for (const a of listAdapters()) {
-      const p = a.id === adapter.id ? plan : planProject(spec, a);
+    for (const a of listAdapters().filter((x) => declares(x, "recipeShaped"))) {
+      const p = planFor(a);
       const dirs = p.files.map((f) => f.path).filter((x) => x.includes("/data/"));
       const singular = a.mcVersion.startsWith("1.21");
       const expectedRecipes = singular ? "/data/examplemod/recipe/" : "/data/examplemod/recipes/";
@@ -140,7 +167,7 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
 
   it("emits parseable JSON for every generated data/resource file", () => {
     for (const a of listAdapters()) {
-      const p = a.id === adapter.id ? plan : planProject(spec, a);
+      const p = planFor(a);
       for (const f of p.files) {
         if (!f.path.endsWith(".json")) continue;
         expect(() => JSON.parse(f.content), a.id + ": " + f.path).not.toThrow();
@@ -148,9 +175,9 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
     }
   });
 
-  it("generates the entity slice for every adapter, with the version's loot directory", () => {
-    for (const a of listAdapters()) {
-      const p = a.id === adapter.id ? plan : planProject(spec, a);
+  it("generates the entity slice for every adapter that declares it", () => {
+    for (const a of listAdapters().filter((x) => declares(x, "entityClass"))) {
+      const p = planFor(a);
       const paths = p.files.map((f) => f.path);
       expect(paths, a.id + " entity class").toContain("src/main/java/com/examplemod/entity/ModMainRubyGolemEntity.java");
       expect(paths, a.id + " renderer").toContain("src/main/java/com/examplemod/client/ModMainRubyGolemRenderer.java");
@@ -172,7 +199,7 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
   });
 
   it("keeps entity attributes and the client model inside adapter data (no version branches in the engine)", () => {
-    for (const a of listAdapters()) {
+    for (const a of listAdapters().filter((x) => declares(x, "entityClass"))) {
       expect(Object.keys(a.entityKinds).length, a.id).toBeGreaterThan(0);
       expect(a.entityKinds.monster.attributeBase).toMatch(/createMonsterAttributes|createMobAttributes/);
       for (const model of Object.values(a.entityModels)) {
@@ -185,8 +212,8 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
   });
 
   it("emits a data-generation entry point and Gradle wiring when the spec opts in", () => {
-    for (const a of listAdapters()) {
-      const p = a.id === adapter.id ? plan : planProject(spec, a);
+    for (const a of listAdapters().filter((x) => declares(x, "dataGenClass"))) {
+      const p = planFor(a);
       const paths = p.files.map((f) => f.path);
       expect(paths, a.id + " datagen entry").toContain("src/main/java/com/examplemod/datagen/ModMainDataGen.java");
       expect(paths, a.id + " example provider").toContain("src/main/java/com/examplemod/datagen/ModMainExampleProvider.java");
@@ -206,7 +233,7 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
   it("emits no data-generation wiring when the spec leaves datagen off", () => {
     const off = { ...spec, datagen: false };
     for (const a of listAdapters()) {
-      const p = planProject(off as typeof spec, a);
+      const p = planProject({ ...specFor(a), datagen: false }, a);
       expect(p.files.some((f) => f.path.includes("/datagen/")), a.id + " should not emit datagen classes").toBe(false);
       const build = p.files.find((f) => f.path === "build.gradle")!.content;
       expect(build, a.id + " should not wire a data run").not.toMatch(/runDatagen|runData/);
@@ -225,5 +252,24 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
       expect(Object.keys(a.templates).length).toBeGreaterThan(15);
       expect(a.notes.length, `${a.id} should document its own traps`).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("partial adapters fail loudly instead of emitting broken Java", () => {
+  // The whole point of stripping a slice is that asking for it must be a clear error, not a
+  // plausible-looking plan that produces Java the compiler will reject. Verified by compile:
+  // a 1.21.1 entity template does not compile on 1.21.4 (MobRenderer gained a type variable).
+  it("rejects a slice the adapter does not declare", () => {
+    const partial = listAdapters().find((a) => !declares(a, "entityClass"));
+    expect(partial, "expected at least one adapter without the entity slice").toBeDefined();
+    const full = structuredClone(spec);
+    expect(() => planProject(full, partial!)).toThrow(/does not support content\.entities/);
+  });
+
+  it("still generates the slices it does declare", () => {
+    const partial = listAdapters().find((a) => !declares(a, "entityClass"))!;
+    const p = planProject(specFor(partial), partial);
+    expect(p.files.length).toBeGreaterThan(20);
+    expect(p.files.some((f) => f.path.endsWith("ModMainItems.java"))).toBe(true);
   });
 });

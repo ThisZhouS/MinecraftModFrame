@@ -40,9 +40,15 @@ MCMOD/
 |   |   |       |-- gradlew.bat
 |   |   |       `-- PROVENANCE.md
 |   |   |-- data
+|   |   |   |-- fabric-1.20.4.json
 |   |   |   |-- fabric-1.21.1.json
+|   |   |   |-- fabric-1.21.4.json
 |   |   |   |-- forge-1.20.1.json
-|   |   |   `-- neoforge-1.21.1.json
+|   |   |   |-- forge-1.20.4.json
+|   |   |   |-- forge-1.21.4.json
+|   |   |   |-- neoforge-1.20.4.json
+|   |   |   |-- neoforge-1.21.1.json
+|   |   |   `-- neoforge-1.21.4.json
 |   |   |-- src
 |   |   |   `-- index.ts
 |   |   |-- test
@@ -105,7 +111,8 @@ MCMOD/
 |-- scripts
 |   |-- mcp-smoke.mjs
 |   |-- update_tree.py
-|   `-- verify-build.mjs
+|   |-- verify-build.mjs
+|   `-- version-facts.mjs
 |-- Tree
 |   |-- docs.md
 |   |-- docs__research.md

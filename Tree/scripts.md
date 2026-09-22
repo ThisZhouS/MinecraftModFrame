@@ -7,3 +7,4 @@
 - `scripts/mcp-smoke.mjs`
 - `scripts/update_tree.py` - symbols: main, symbols, tree_lines, visible_children, write_notes
 - `scripts/verify-build.mjs`
+- `scripts/version-facts.mjs`
