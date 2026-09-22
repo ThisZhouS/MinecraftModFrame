@@ -69,7 +69,9 @@ describe("fabric-1.21.1 adapter", () => {
   it("renders version facts from the adapter, never hard-coded in templates", () => {
     expect(plan.files.find((f) => f.path === "gradle.properties")!.content).toContain("minecraft_version=1.21.1");
     const gradleProps = plan.files.find((f) => f.path === "build.gradle")!.content;
-    expect(gradleProps).toContain("JavaVersion.VERSION_21");
+    // toVersion() rather than VERSION_<n>: Java 8 is VERSION_1_8 in Gradle, so a bare
+    // "VERSION_" + version would emit VERSION_8 and fail on every Java 8 target.
+    expect(gradleProps).toContain("JavaVersion.toVersion(21)");
     expect(gradleProps).not.toContain("1.21.1");
   });
 });

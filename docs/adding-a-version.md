@@ -99,7 +99,21 @@ cp packages/adapters/data/<loader>-<oldVersion>.json packages/adapters/data/<loa
 | --- | --- | --- |
 | 1.21.4 fabric/forge | 1.21.1 / 1.20.1 | ✅ 编译通过（少数构建事实差异） |
 | 1.20.4 fabric/forge | 1.21.1 / 1.20.1 | ✅ 编译通过（一处 `ResourceLocation` 差异） |
-| **1.19.4 / 1.16.5** | 1.20.4 | ❌ **未通过，适配器已移除** |
+| **1.19.4** | 1.20.4 | ✅ 编译通过（**按年代重写**后，见下） |
+| **1.16.5** | 1.19.4 | ❌ **未通过，适配器已移除** |
+
+### 1.16.5：不是修几处，是整套重写
+
+由编译器列出的差异（尚未逐条取证，下次先做这一步）：
+
+- `net.minecraft.core.registries` **包不存在**——1.16.5 是 `net.minecraft.core.Registry` / `BuiltInRegistries` 的前身。
+- Fabric 物品组 API 路径完全不同：不是 `net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup`，
+  而是 `net.fabricmc.fabric.api.client.itemgroup.FabricItemGroupBuilder`。
+- `org.slf4j` **不在编译类路径上**（旧 loom 不注入）——主类的日志导入要换。
+- 还有 1.13 前不存在的东西：`Item.Properties` 之前的构造方式、创造模式标签页是 `ItemGroup` 而非 `CreativeModeTab`。
+
+结论：1.16.5 需要**整套模板重写**（主类、两个注册类、物品组 API、包名、日志），
+而不是像 1.19.4 那样改 4 处。做法同样是**先 javap 取证再写**。
 
 1.19.4 / 1.16.5 的实测差异（由编译器抓出，逐条已核对）：
 
