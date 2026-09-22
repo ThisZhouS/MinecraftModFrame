@@ -99,6 +99,10 @@ export function makeFixtureAdapter(): AdapterRecordT {
     // Adapter-level (not template) data: how an item is constructed, and what to import for it.
     itemBehaviors: { plain: "new Item({{SETTINGS}})", fishing_rod: "new FishingRod({{SETTINGS}})" },
     itemBehaviorImports: { fishing_rod: "com.example.FishingRod" },
+    references: [
+      { label: "Fixture loader docs", url: "https://example.invalid/docs", kind: "official-docs", note: "stand-in for a real official doc" },
+      { label: "Fixture mappings lookup", url: "https://example.invalid/mappings", kind: "mappings" },
+    ],
     notes: ["fixture adapter for core tests"],
   };
 }

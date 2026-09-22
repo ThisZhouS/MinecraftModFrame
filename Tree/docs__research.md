@@ -4,6 +4,7 @@
 
 ## 内容
 
+- `docs/research/2026-09-cn-modding-resources.md`
 - `docs/research/2026-09-mcp-agent-ecosystem.md`
 - `docs/research/2026-09-scaffolding-tools.md`
 - `docs/research/2026-09-version-api-knowledge.md`

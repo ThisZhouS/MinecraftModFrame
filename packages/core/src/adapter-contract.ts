@@ -46,6 +46,29 @@ export const ContentPathsSpec = z.object({
   entityTexture: z.string().optional(),
 });
 
+/**
+ * Where a target's version facts come from.
+ *
+ * The whole point of an adapter is to stop agents re-deriving version knowledge from training data or
+ * from scattered tutorials. That only works if the adapter can also say *where to look* when a fact
+ * is missing or suspect — so each target carries its own authoritative sources, and they travel to
+ * the agent through get_adapter / `mcmod adapter` alongside the facts themselves.
+ */
+export const ReferenceSpec = z.object({
+  label: z.string().min(1),
+  url: z.string().regex(/^https:\/\/\S+$/, "reference urls must be https"),
+  kind: z.enum([
+    "official-docs", // the loader's own documentation
+    "mappings", // name-mapping lookup (mojmap/yarn/MCP/SRG)
+    "migration", // "what changed between version X and Y" guides
+    "example-mod", // a maintained reference project
+    "datapack", // datapack/resource-pack format references and tools
+    "community", // community tutorials and discussion
+  ]),
+  /** What this source is good for — keeps the list from being a bare link dump. */
+  note: z.string().optional(),
+}).strict();
+
 export const LangKeysSpec = z.object({
   item: z.string(),
   block: z.string(),
@@ -197,6 +220,8 @@ export const AdapterRecord = z.object({
   contentPaths: ContentPathsSpec,
   langKeys: LangKeysSpec,
   notes: z.array(z.string()).default([]),
+  /** Authoritative sources for this (version x loader); see ReferenceSpec. */
+  references: z.array(ReferenceSpec).default([]),
 }).strict();
 
 export type AdapterRecordT = z.infer<typeof AdapterRecord>;
@@ -387,6 +412,16 @@ export function lintAdapter(a: AdapterRecordT): string[] {
     for (const ph of wanted) {
       if (!body.includes(ph)) problems.push(`template "${key}" must use ${ph}`);
     }
+  }
+  // A duplicated link is almost always a copy-paste slip, and it makes the list look longer than the
+  // knowledge behind it actually is.
+  const seenUrls = new Set<string>();
+  for (const r of a.references) {
+    if (seenUrls.has(r.url)) problems.push(`duplicate reference url: ${r.url}`);
+    seenUrls.add(r.url);
+  }
+  if (a.references.length > 0 && !a.references.some((r) => r.kind === "official-docs")) {
+    problems.push('references should include the loader\'s own documentation (kind "official-docs")');
   }
   // Tab-entry lines are emitted into register(), which runs from the mod constructor — before any
   // RegisterEvent has populated a DeferredRegister. Resolving a registry entry there throws

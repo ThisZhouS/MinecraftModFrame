@@ -225,5 +225,37 @@
   },
   "itemBehaviorImports": {
     "fishing_rod": "net.minecraft.world.item.FishingRodItem"
-  }
+  },
+  "references": [
+    {
+      "label": "Forge 官方文档",
+      "url": "https://mcforge.readthedocs.io/en/latest/",
+      "kind": "official-docs",
+      "note": "权威来源：DeferredRegister、事件、数据生成"
+    },
+    {
+      "label": "ForgeGradle 6 迁移指南",
+      "url": "https://gist.github.com/ChampionAsh5357/98b08c117cb2057d8029a8919c378a4c",
+      "kind": "migration",
+      "note": "本适配器钉 Gradle 8.8 的原因（ForgeGradle 6 不兼容 Gradle 9）"
+    },
+    {
+      "label": "1.19.4 -> 1.20 迁移指南",
+      "url": "https://gist.github.com/ChampionAsh5357/cf818acc53ffea6f4387fe28c2977d56",
+      "kind": "migration",
+      "note": "ChampionAsh5357 逐版本迁移笔记，高版本同样适用"
+    },
+    {
+      "label": "Forge 官方下载",
+      "url": "https://files.minecraftforge.net/",
+      "kind": "official-docs",
+      "note": "核对 loaderVersion 与 MC 版本对应关系"
+    },
+    {
+      "label": "Linkie 映射表查询",
+      "url": "https://linkie.shedaniel.dev/mappings",
+      "kind": "mappings",
+      "note": "查 mojmap 对应名，写模板前核对签名"
+    }
+  ]
 }

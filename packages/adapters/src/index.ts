@@ -103,6 +103,33 @@ export function resolveAsset(assetKey: string): string {
 }
 
 /**
+ * The agent-facing view of one adapter: the version facts an agent needs, plus the sources those
+ * facts came from.
+ *
+ * Lives here rather than in each surface because the CLI and the MCP server used to hand-roll this
+ * field list separately — the exact way two surfaces drift until one of them silently stops
+ * reporting a field. `references` is why it matters: it is the only part of an adapter that tells an
+ * agent where to look next, so it must reach every surface.
+ */
+export function adapterSummary(a: AdapterRecordT, includeTemplates = false): Record<string, unknown> {
+  return {
+    id: a.id,
+    mcVersion: a.mcVersion,
+    loader: a.loader,
+    loaderVersion: a.loaderVersion,
+    java: a.java,
+    mappings: a.mappings,
+    gradleWrapperVersion: a.gradleWrapperVersion,
+    contentPaths: a.contentPaths,
+    langKeys: a.langKeys,
+    notes: a.notes,
+    references: a.references,
+    templateKeys: Object.keys(a.templates),
+    templates: includeTemplates ? a.templates : undefined,
+  };
+}
+
+/**
  * planGeneration + adapter-owned asset resolution. This is the single planning entry point the
  * CLI, MCP server and HTTP API all call, so no surface can forget the wrapper jar.
  */

@@ -14,13 +14,27 @@ node packages/cli/dist/index.js adapter <id> --templates   # 参考一个已有�
 
 ## 1. 取证：不要凭记忆写版本事实
 
+**先看目标适配器自带的 `references[]`**——每个适配器都记录了该 (版本 × 加载器) 的权威来源（官方文档、映射查询、迁移指南）：
+
+```bash
+node packages/cli/dist/index.js adapter forge-1.20.1 --json   # 人 / 脚本
+# 智能体走 MCP：get_adapter { mcVersion, loader }
+```
+
+`kind: "migration"` 的那些尤其省时间：**「这一版改了什么」几乎总能在那类文档里直接找到答案**，比逐类 `javap` 试错快得多。
+
 本仓库一贯的做法是**先取证再写模板**，三个层次：
 
 | 手段 | 用途 | 本仓库实例 |
 | --- | --- | --- |
 | `javap` 真实映射 jar | 拿到**类是否存在、方法签名是什么**——这是文档最容易过时、也最容易骗人的地方 | `Screen#renderBackground` 在 1.20.1 收 `(GuiGraphics)`、1.21.x 收 `(GuiGraphics,int,int,float)`，两版分叉进各自模板 |
 | 读 **jar 内原版数据** | 拿到**数据包 JSON 的方言**——`gradle build` 完全不校验 JSON 语义，文档也常滞后 | 1.21 把物品栈键从 `item` 改成 `id`、物品谓词拍平成字符串、目录 `recipes/`→`recipe/`；共发现并修复 4 处 |
-| 官方示例 / 文档 | 拿到**构建事实**（插件版本、Gradle/JDK 约束、仓库地址） | `fabric-example-mod`（CC0）、各加载器官网 |
+| 官方示例 / 文档 / 迁移指南 | 拿到**构建事实**（插件版本、Gradle/JDK 约束、仓库地址）与**版本差异** | `fabric-example-mod`（CC0）、各加载器官网、ChampionAsh5357 的逐版本迁移 gist |
+
+映射查询工具（Linkie、Parchment）用来在写模板前核对名字——**映射名是本仓库最容易出错、也最难靠编译发现的一类事实**
+（名字写错通常编译报错，但名字"能编译却语义不同"时只有核对来源才发现）。
+
+中文资源索引（含教程、工具、社群）见 `docs/research/2026-09-cn-modding-resources.md`；注意其许可边界，只取链接目标。
 
 **判断标准**：任何「我记得是这样」的版本事实，都必须落到上面某一种证据上，否则写进 `notes` 时标注为未取证。
 

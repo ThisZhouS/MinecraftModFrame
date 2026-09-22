@@ -1,7 +1,7 @@
 import { z } from "zod/v4";
 import { McmodError, emitPlan, exampleSpec, parseModSpec } from "@mcmodkit/core";
 import type { AdapterRecordT, ModSpecT } from "@mcmodkit/core";
-import { getAdapter, listAdapters, listTargets, planProject, requireAdapter } from "@mcmodkit/adapters";
+import { adapterSummary, getAdapter, listAdapters, listTargets, planProject, requireAdapter } from "@mcmodkit/adapters";
 
 /**
  * Tool handlers, kept SDK-independent so they can be unit-tested directly and reused by any
@@ -20,23 +20,6 @@ export interface ToolDef {
   /** Re-running with the same inputs converges to the same files. */
   idempotent?: boolean;
   handler: (args: Record<string, unknown>) => Promise<unknown>;
-}
-
-function adapterSummary(a: AdapterRecordT, includeTemplates: boolean): Record<string, unknown> {
-  return {
-    id: a.id,
-    mcVersion: a.mcVersion,
-    loader: a.loader,
-    loaderVersion: a.loaderVersion,
-    java: a.java,
-    mappings: a.mappings,
-    gradleWrapperVersion: a.gradleWrapperVersion,
-    contentPaths: a.contentPaths,
-    langKeys: a.langKeys,
-    notes: a.notes,
-    templateKeys: Object.keys(a.templates),
-    templates: includeTemplates ? a.templates : undefined,
-  };
 }
 
 export const toolDefs: ToolDef[] = [

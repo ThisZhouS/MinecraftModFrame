@@ -5,4 +5,4 @@
 ## 内容
 
 - `packages/mcp-server/src/index.ts` - symbols: jsonContent
-- `packages/mcp-server/src/tools.ts` - symbols: adapterSummary
+- `packages/mcp-server/src/tools.ts`

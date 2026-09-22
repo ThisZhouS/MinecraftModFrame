@@ -16,7 +16,7 @@ import {
   prefetchTextures,
 } from "@mcmodkit/core";
 import type { ModSpecT } from "@mcmodkit/core";
-import { listAdapters, listTargets, planProject, requireAdapter } from "@mcmodkit/adapters";
+import { adapterSummary, listAdapters, listTargets, planProject, requireAdapter } from "@mcmodkit/adapters";
 import { pathToFileURL } from "node:url";
 import { writeFile } from "node:fs/promises";
 import { loadSpecJson } from "./load-spec.js";
@@ -49,21 +49,8 @@ program
       const known = listTargets().map((t) => t.id).join(", ");
       throw new McmodError("ADAPTER_NOT_FOUND", 'Unknown adapter id "' + id + '". Installed: ' + (known || "(none)"), { id });
     }
-    const data = {
-      id: a.id,
-      mcVersion: a.mcVersion,
-      loader: a.loader,
-      loaderVersion: a.loaderVersion,
-      java: a.java,
-      mappings: a.mappings,
-      gradleWrapperVersion: a.gradleWrapperVersion,
-      contentPaths: a.contentPaths,
-      langKeys: a.langKeys,
-      notes: a.notes,
-      templateKeys: Object.keys(a.templates),
-      templates: opts.templates === true ? a.templates : undefined,
-    };
-    printOk(data, opts.json === true);
+    // Shared with the MCP server so the two surfaces cannot drift apart.
+    printOk(adapterSummary(a, opts.templates === true), opts.json === true);
   });
 
 program

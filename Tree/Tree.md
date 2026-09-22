@@ -8,6 +8,7 @@
 MCMOD/
 |-- docs
 |   |-- research
+|   |   |-- 2026-09-cn-modding-resources.md
 |   |   |-- 2026-09-mcp-agent-ecosystem.md
 |   |   |-- 2026-09-scaffolding-tools.md
 |   |   `-- 2026-09-version-api-knowledge.md

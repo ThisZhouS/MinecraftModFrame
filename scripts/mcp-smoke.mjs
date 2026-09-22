@@ -59,6 +59,18 @@ const spec = {
   },
 };
 
+// Version-facts lookup must carry the sources those facts came from, or an agent has to go
+// searching the web again — the exact thing the references exist to prevent.
+const adapter = await call("tools/call", {
+  name: "get_adapter",
+  arguments: { mcVersion: "1.20.1", loader: "forge" },
+});
+const adapterJson = JSON.parse(adapter.result?.content?.[0]?.text ?? "{}");
+const refs = adapterJson.data?.references ?? [];
+console.log(`get_adapter -> refs=${refs.length} kinds=${[...new Set(refs.map((r) => r.kind))].sort().join(",")}`);
+for (const r of refs) console.log(`   [${r.kind}] ${r.label} -> ${r.url}`);
+if (refs.length === 0) throw new Error("get_adapter returned no references");
+
 const dry = await call("tools/call", { name: "scaffold_mod", arguments: { spec, outDir: ".mcp-out", dryRun: true } });
 const dryText = dry.result?.content?.[0]?.text ?? "";
 const dryJson = JSON.parse(dryText);

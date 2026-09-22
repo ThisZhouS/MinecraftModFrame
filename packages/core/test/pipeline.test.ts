@@ -63,6 +63,35 @@ describe("lintAdapter", () => {
     expect(lintAdapter(a)).toEqual([]);
   });
 
+  // references are how an agent finds the authoritative source for a version fact it is missing.
+  // A malformed or duplicated list is worse than none: it looks authoritative while being wrong.
+  it("rejects a duplicate reference url", () => {
+    const a = makeFixtureAdapter();
+    a.references = [
+      { label: "Docs", url: "https://example.invalid/docs", kind: "official-docs" },
+      { label: "Docs again", url: "https://example.invalid/docs", kind: "community" },
+    ];
+    expect(lintAdapter(a).join("\n")).toMatch(/duplicate reference url/);
+  });
+
+  it("requires the loader's own documentation once references exist", () => {
+    const a = makeFixtureAdapter();
+    a.references = [{ label: "A tutorial", url: "https://example.invalid/tut", kind: "community" }];
+    expect(lintAdapter(a).join("\n")).toMatch(/official-docs/);
+  });
+
+  it("rejects a non-https reference url at parse time", () => {
+    const a = makeFixtureAdapter();
+    a.references = [{ label: "Insecure", url: "http://example.invalid/docs", kind: "official-docs" }];
+    const r = parseAdapterRecord(a);
+    expect(r.ok).toBe(false);
+    expect(r.issues.join("\n")).toMatch(/https/);
+  });
+
+  it("accepts a well-formed reference list", () => {
+    expect(lintAdapter(makeFixtureAdapter())).toEqual([]);
+  });
+
   it("rejects half-implemented screen support", () => {
     const a = makeFixtureAdapter();
     delete (a.templates as Record<string, unknown>).keybindRegister;

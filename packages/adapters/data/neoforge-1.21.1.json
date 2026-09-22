@@ -222,5 +222,31 @@
   },
   "itemBehaviorImports": {
     "fishing_rod": "net.minecraft.world.item.FishingRodItem"
-  }
+  },
+  "references": [
+    {
+      "label": "NeoForge 官方文档",
+      "url": "https://docs.neoforged.net/",
+      "kind": "official-docs",
+      "note": "权威来源：ModDevGradle、DeferredRegister、事件总线"
+    },
+    {
+      "label": "NeoForge 迁移入门指南（primer）",
+      "url": "https://github.com/neoforged/.github/tree/main/primers",
+      "kind": "migration",
+      "note": "官方逐版本差异说明——新增版本时先读这里"
+    },
+    {
+      "label": "NeoForge 官方站",
+      "url": "https://neoforged.net/",
+      "kind": "official-docs",
+      "note": "版本与发布信息"
+    },
+    {
+      "label": "Linkie 映射表查询",
+      "url": "https://linkie.shedaniel.dev/mappings",
+      "kind": "mappings",
+      "note": "查 mojmap 对应名，写模板前核对签名"
+    }
+  ]
 }

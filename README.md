@@ -51,6 +51,8 @@ MCP 工具**不执行任何 shell/构建命令**：构建由使用方自行决�
 
 新增一个目标 = 新增 `packages/adapters/data/<loader>-<mcVersion>.json`（可用 `mcmod adapter <id> --templates` 参考现有适配器），无需改动引擎。
 
+**适配器还带 `references[]`——该目标的权威来源**（官方文档 / 映射查询 / 迁移指南 / 示例工程）。它随 `notes` 一起通过 `mcmod adapter <id>` 与 MCP `get_adapter` 到达智能体：**缺某个版本事实时，目标自己会告诉你该去哪儿查**，而不是回去翻训练数据。取证流程见 `docs/adding-a-version.md`。
+
 ## 生成的工程长什么样
 
 ```

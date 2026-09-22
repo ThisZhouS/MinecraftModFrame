@@ -220,5 +220,37 @@
   },
   "itemBehaviorImports": {
     "fishing_rod": "net.minecraft.world.item.FishingRodItem"
-  }
+  },
+  "references": [
+    {
+      "label": "Fabric 官方 Wiki",
+      "url": "https://fabricmc.net/wiki/start",
+      "kind": "official-docs",
+      "note": "权威来源：入口点、注册、事件、mixin 的官方说明"
+    },
+    {
+      "label": "Fabric 官方模板生成器",
+      "url": "https://fabricmc.net/develop/template/",
+      "kind": "official-docs",
+      "note": "按 MC 版本给出当前推荐的 loom/loader/API 版本组合"
+    },
+    {
+      "label": "fabric-example-mod",
+      "url": "https://github.com/FabricMC/fabric-example-mod",
+      "kind": "example-mod",
+      "note": "本适配器的构建事实即以此仓库（CC0）取证"
+    },
+    {
+      "label": "Linkie 映射表查询",
+      "url": "https://linkie.shedaniel.dev/mappings",
+      "kind": "mappings",
+      "note": "查 mojmap/yarn/intermediary 对应名，写模板前核对签名"
+    },
+    {
+      "label": "Parchment 第三方参数名",
+      "url": "https://parchmentmc.org/docs/getting-started",
+      "kind": "mappings",
+      "note": "1.16.5+ 的参数名反混淆表；官方映射不带参数名"
+    }
+  ]
 }

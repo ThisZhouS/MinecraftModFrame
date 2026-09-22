@@ -25,6 +25,21 @@
 - `packages/api`：`node:http` JSON API（`/api/versions`、`/api/validate`、`/api/generate` 等）。
 - 测试分布：core 14、adapters 10、cli 4、mcp-server 6、api 6。
 
+## S15 交付物（版本事实的权威来源：adapter references，已完成）
+
+**动机**：结合 `mouse0w0/MinecraftDeveloperGuide`（中文开发者资源索引）完善项目。该仓库是**链接索引**而非 API 手册，
+对框架实现几乎无可直接编码的内容；但它精确指出了**「版本事实该去哪里取证」**——正是本项目最含糊的一环。
+
+- 适配器契约新增 `references[]`：`{ label, url, kind, note? }`，`kind` ∈ official-docs / mappings / migration / example-mod / datapack / community。
+- 三适配器各填入真实来源（官方文档、Linkie 映射查询、Parchment、ChampionAsh5357 迁移 gist、NeoForge primer 等）。
+- 约束由 schema + lint 强制：URL 必须 https；不允许重复 URL；只要声明 references 就必须含官方文档（避免只堆二手教程）。
+- **`adapterSummary()` 收敛到 `packages/adapters`**：CLI 与 MCP 此前各自手写字段清单——那正是「字段只到一个面」的典型成因。
+  现在 `references` 随事实一起到 `mcmod adapter <id>` 与 MCP `get_adapter`。
+- **许可边界**：原指南 CC-BY-SA-4.0 与本仓库 MIT 不兼容 ⇒ **只取链接目标，不复制任何原文表述**；说明文字均自写。
+  见 `docs/research/2026-09-cn-modding-resources.md`。
+- 验收：core 67 项（+4 项 references 约束）、adapters 22 项（+2 项 adapterSummary）、全套 105 项通过；
+  MCP 冒烟脚本实测 `get_adapter` 返回 5 条 references（kinds: mappings,migration,official-docs）。
+
 ## S14 交付物（运行期缺陷修复：Forge 创造模式标签页，已完成）
 
 **背景**：把 MK2 钓鱼竿装进真实 Forge 1.20.1 客户端启动，崩溃：
