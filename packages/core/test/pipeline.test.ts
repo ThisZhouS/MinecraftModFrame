@@ -63,6 +63,21 @@ describe("lintAdapter", () => {
     expect(lintAdapter(a)).toEqual([]);
   });
 
+  // Regression: the 1.16.5 adapter inherited `var id = ...` from a Java 17 sibling. javac reports
+  // that as "cannot find symbol: class var", which says nothing about language levels, and only for
+  // targets someone actually compiles. Java 8 is the last level where it is a plain error.
+  it("rejects `var` on a Java 8 target", () => {
+    const a = makeFixtureAdapter();
+    a.java = 8;
+    a.templates.blockRegistration = "var {{REG_NAME}} = new Block({{SETTINGS}});";
+    expect(lintAdapter(a).join("\n")).toMatch(/`var`, which needs Java 10\+/);
+
+    const b = makeFixtureAdapter();
+    b.java = 17;
+    b.templates.blockRegistration = "var {{REG_NAME}} = new Block({{SETTINGS}});";
+    expect(lintAdapter(b)).toEqual([]);
+  });
+
   // references are how an agent finds the authoritative source for a version fact it is missing.
   // A malformed or duplicated list is worse than none: it looks authoritative while being wrong.
   it("rejects a duplicate reference url", () => {
@@ -143,6 +158,26 @@ describe("planGeneration", () => {
     expect(regs).toContain("registerIn(ItemGroups.INGREDIENTS, charged_ruby");
     expect(regs).toContain("tab.add(ModMainItems.Weird);");
     expect(p.warnings.some((w) => w.includes('unknown group "nope"'))).toBe(true);
+  });
+
+  // Older versions bind the creative tab while the item is constructed (Item.Properties#tab on
+  // 1.16) instead of through a post-registration hook (ItemGroupEvents on 1.19+). The adapter picks
+  // which form by shipping itemGroupSuffix, itemRegistrationGroup, or both.
+  it("binds the group at construction time when the adapter ships itemGroupSuffix", () => {
+    const a = makeFixtureAdapter();
+    a.templates.itemGroupSuffix = ".tab({{GROUP_EXPR}})";
+    a.templates.itemSettings = "Settings.DEFAULT{{GROUP_SUFFIX}}{{DURABILITY_SUFFIX}}";
+    a.templates.itemSettingsMaxCount = "Settings.DEFAULT.maxCount({{MAX_COUNT}}){{GROUP_SUFFIX}}{{DURABILITY_SUFFIX}}";
+    // A version with no post-registration hook leaves the hook template empty.
+    a.templates.itemRegistrationGroup = "";
+    const p = planGeneration(parseSpecOrThrow(SPEC), a);
+    const regs = p.files.find((f) => f.path.endsWith("ModMainItems.java"))!.content;
+
+    expect(regs).toContain("new Item(Settings.DEFAULT.maxCount(16).tab(ItemGroups.INGREDIENTS))");
+    // An item with no group must not get a dangling .tab().
+    expect(regs).toContain("new Item(Settings.DEFAULT)");
+    // The empty hook contributes nothing at all, not a stray blank line.
+    expect(regs).not.toContain("registerIn(");
   });
 
   it("uses maxCount settings variant", () => {

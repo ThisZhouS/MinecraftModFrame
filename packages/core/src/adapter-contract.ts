@@ -413,6 +413,17 @@ export function lintAdapter(a: AdapterRecordT): string[] {
       if (!body.includes(ph)) problems.push(`template "${key}" must use ${ph}`);
     }
   }
+  // `var` is a Java 10+ language feature. On a Java 8 target the compiler reports it as the
+  // baffling "cannot find symbol: class var" rather than anything about language levels, and only
+  // for targets someone actually builds — so catch it here instead.
+  if (a.java < 10) {
+    for (const [key, body] of Object.entries(a.templates)) {
+      // The declared name is usually a placeholder (`var {{CONST}} = ...`), so accept both forms.
+      if (/(^|[^\w.$])var\s+([A-Za-z_$]|\{\{)/.test(body)) {
+        problems.push(`template "${key}" uses \`var\`, which needs Java 10+, but this adapter targets Java ${a.java}`);
+      }
+    }
+  }
   // A duplicated link is almost always a copy-paste slip, and it makes the list look longer than the
   // knowledge behind it actually is.
   const seenUrls = new Set<string>();

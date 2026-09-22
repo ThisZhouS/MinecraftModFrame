@@ -132,11 +132,27 @@ function genItems(ctx: GenContext): ItemGenOut {
     const constName = toPascalCase(item.id);
     const display = item.name ?? toDisplayName(item.id);
     const v = { ...ctx.vars, CONST: constName, CONST_UPPER: toScreamingSnake(constName), REG_NAME: item.id, DISPLAY: display, id: item.id };
+    const groupExpr = item.group != null ? ctx.adapter.vanillaGroups[item.group] : undefined;
+    // Two eras route an item into a vanilla tab in two different ways: older versions bind the tab
+    // while the item is constructed (Item.Properties#tab on 1.16), newer ones add it after the fact
+    // through a registration hook (ItemGroupEvents on 1.19+). Which form applies is adapter data -
+    // itemGroupSuffix renders the construction-time one, itemRegistrationGroup the hook. An adapter
+    // that ships neither keeps vanilla groups unavailable and the spec falls back to the mod's tab.
+    const groupSuffix =
+      groupExpr === undefined || ctx.adapter.templates.itemGroupSuffix === undefined
+        ? ""
+        : renderTemplate(ctx.adapter.templates.itemGroupSuffix, { ...v, GROUP_EXPR: groupExpr }, "itemGroupSuffix");
     const settingsKey = item.maxCount != null ? "itemSettingsMaxCount" : "itemSettings";
     const durabilitySuffix = item.durability === undefined ? "" : `.durability(${item.durability})`;
     const settings = renderTemplate(
       ctx.adapter.templates[settingsKey]!,
-      { ...v, MAX_COUNT: String(item.maxCount ?? 64), DURABILITY_SUFFIX: durabilitySuffix },
+      {
+        ...v,
+        MAX_COUNT: String(item.maxCount ?? 64),
+        DURABILITY_SUFFIX: durabilitySuffix,
+        GROUP_EXPR: groupExpr ?? "",
+        GROUP_SUFFIX: groupSuffix,
+      },
       settingsKey,
     );
     const behaviorExpr = ctx.adapter.itemBehaviors[item.behavior];
@@ -148,11 +164,16 @@ function genItems(ctx: GenContext): ItemGenOut {
       );
     }
     const itemCtor = renderTemplate(behaviorExpr, { ...v, SETTINGS: settings }, `itemBehaviors.${item.behavior}`);
-    const groupExpr = item.group != null ? ctx.adapter.vanillaGroups[item.group] : undefined;
     let registration: string;
     if (item.group != null && groupExpr != null) {
       registration = renderTemplate(ctx.adapter.templates.itemRegistration!, { ...v, SETTINGS: settings, ITEM_CTOR: itemCtor }, "itemRegistration");
-      out.groupHooks.push(renderTemplate(ctx.adapter.templates.itemRegistrationGroup!, { ...v, SETTINGS: settings, ITEM_CTOR: itemCtor, GROUP_EXPR: groupExpr }, "itemRegistrationGroup"));
+      // An adapter whose version binds the tab at construction time leaves this empty on purpose.
+      const hook = renderTemplate(
+        ctx.adapter.templates.itemRegistrationGroup!,
+        { ...v, SETTINGS: settings, ITEM_CTOR: itemCtor, GROUP_EXPR: groupExpr },
+        "itemRegistrationGroup",
+      );
+      if (hook.trim() !== "") out.groupHooks.push(hook);
     } else {
       if (item.group != null) {
         ctx.warnings.push(`item "${item.id}": unknown group "${item.group}" for adapter ${ctx.adapter.id}; placed in the mod's own tab`);
@@ -954,7 +975,10 @@ export function planGeneration(spec: ModSpecT, adapter: AdapterRecordT, options:
   files.push(...ui.files, ...recipes.files, ...advancements.files, ...entities.files, ...datagen.files, ...textures.files);
 
   const langObj: Record<string, string> = {
-    [renderTemplate(adapter.langKeys.itemGroup, { namespace: ctx.vars.namespace! }, "langKeys.itemGroup")]: ctx.vars.modName!,
+    // The whole variable set, not just {{namespace}}: a loader that derives the tab's key from the
+    // identifier it is handed (Fabric's builder formats it as "<namespace>.<path>") needs {{modId}}
+    // too, and a spec may set mod.namespace to something other than mod.modId.
+    [renderTemplate(adapter.langKeys.itemGroup, ctx.vars, "langKeys.itemGroup")]: ctx.vars.modName!,
     ...items.langEntries,
     ...blocks.langEntries,
     ...ui.langEntries,

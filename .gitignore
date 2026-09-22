@@ -19,3 +19,5 @@ out/
 # These are dot-prefixed and transient; a stray `git add -A` should never pick them up.
 .scratch/
 .probe/
+# Per-version probe dirs (.probe116, .probe-1.12, ...) - same rules, named per target.
+.probe*/
