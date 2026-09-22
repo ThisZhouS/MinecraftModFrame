@@ -40,6 +40,7 @@ export function makeFixtureAdapter(): AdapterRecordT {
       itemRegistrationGroup: "registerIn({{GROUP_EXPR}}, {{REG_NAME}}, {{ITEM_CTOR}});",
       itemSettings: "Settings.DEFAULT{{DURABILITY_SUFFIX}}",
       itemSettingsMaxCount: "Settings.DEFAULT.maxCount({{MAX_COUNT}}){{DURABILITY_SUFFIX}}",
+      itemDurabilitySuffix: ".durability({{DURABILITY}})",
       blockRegistration: "registerBlock({{REG_NAME}}, new Block({{SETTINGS}}));",
       blockSettings: "Settings.DEFAULT.strength({{HARDNESS}}, {{RESISTANCE}}).requiresTool()",
       blockSettingsNoTool: "Settings.DEFAULT.strength({{HARDNESS}}, {{RESISTANCE}})",

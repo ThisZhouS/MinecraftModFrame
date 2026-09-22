@@ -143,7 +143,21 @@ function genItems(ctx: GenContext): ItemGenOut {
         ? ""
         : renderTemplate(ctx.adapter.templates.itemGroupSuffix, { ...v, GROUP_EXPR: groupExpr }, "itemGroupSuffix");
     const settingsKey = item.maxCount != null ? "itemSettingsMaxCount" : "itemSettings";
-    const durabilitySuffix = item.durability === undefined ? "" : `.durability(${item.durability})`;
+    // Durability comes from adapter data for the same reason everything else does: the setter's name
+    // is version-specific (Item.Properties#durability from 1.13, Item#setMaxDamage before that), and
+    // the engine must not know a single Minecraft API name.
+    let durabilitySuffix = "";
+    if (item.durability !== undefined) {
+      const tpl = ctx.adapter.templates.itemDurabilitySuffix;
+      if (tpl === undefined) {
+        throw new McmodError(
+          "ADAPTER_INVALID",
+          `Adapter ${ctx.adapter.id} does not offer item durability; drop "durability" from item "${item.id}" or use an adapter that ships the "itemDurabilitySuffix" template`,
+          { adapterId: ctx.adapter.id, templateKey: "itemDurabilitySuffix", item: item.id },
+        );
+      }
+      durabilitySuffix = renderTemplate(tpl, { ...v, DURABILITY: String(item.durability) }, "itemDurabilitySuffix");
+    }
     const settings = renderTemplate(
       ctx.adapter.templates[settingsKey]!,
       {
@@ -213,16 +227,30 @@ interface BlockGenOut {
 function genBlocks(ctx: GenContext): BlockGenOut {
   const out: BlockGenOut = { files: [], blockRegistrations: [], tabEntries: [], langEntries: {} };
   const mineable: Record<string, string[]> = {};
+  const lootTemplate = ctx.adapter.templates.lootTable;
+  const lootPath = ctx.adapter.contentPaths.lootTable;
   for (const block of ctx.spec.content.blocks) {
     const constName = toPascalCase(block.id);
     const display = block.name ?? toDisplayName(block.id);
-    const v = { ...ctx.vars, CONST: constName, CONST_UPPER: toScreamingSnake(constName), REG_NAME: block.id, DISPLAY: display, id: block.id };
+    // {{tool}} is part of the block's variable set, not just the settings render: a version that
+    // expresses the harvest tool in code (Block#setHarvestLevel before tags existed) needs it at
+    // registration time, where the setter returns void and so cannot be chained into the settings.
+    // Hardness/resistance/tool are part of the block's variable set rather than just the settings
+    // render: a version that applies them as setters (Block#setHardness before 1.13) needs them at
+    // registration time, where the constructor only takes a Material.
+    const v = {
+      ...ctx.vars,
+      CONST: constName,
+      CONST_UPPER: toScreamingSnake(constName),
+      REG_NAME: block.id,
+      DISPLAY: display,
+      id: block.id,
+      tool: block.tool,
+      HARDNESS: String(block.hardness),
+      RESISTANCE: String(block.resistance),
+    };
     const settingsKey = block.tool === "none" ? "blockSettingsNoTool" : "blockSettings";
-    const settings = renderTemplate(
-      ctx.adapter.templates[settingsKey]!,
-      { ...v, HARDNESS: String(block.hardness), RESISTANCE: String(block.resistance), tool: block.tool },
-      settingsKey,
-    );
+    const settings = renderTemplate(ctx.adapter.templates[settingsKey]!, v, settingsKey);
     const blockModelKey = block.model === "cube_column" ? "blockModelColumn" : "blockModel";
     const blockModelTpl = ctx.adapter.templates[blockModelKey];
     if (blockModelTpl === undefined) {
@@ -250,25 +278,36 @@ function genBlocks(ctx: GenContext): BlockGenOut {
         content: renderTemplate(ctx.adapter.templates.blockItemModel!, v, "blockItemModel"),
         managed: true, executable: false, reason: `block:${block.id}:itemModel`,
       },
-      {
-        path: renderPath(ctx.adapter.contentPaths.lootTable, v, "contentPaths.lootTable"),
-        content: renderTemplate(ctx.adapter.templates.lootTable!, v, "lootTable"),
-        managed: true, executable: false, reason: `block:${block.id}:loot`,
-      },
     );
+    // Block loot tables are 1.14+. Before that a plain Block drops itself with no data file, so the
+    // slice is skipped rather than emitting a file the game would ignore.
+    if (lootTemplate !== undefined && lootPath !== undefined) {
+      out.files.push({
+        path: renderPath(lootPath, v, "contentPaths.lootTable"),
+        content: renderTemplate(lootTemplate, v, "lootTable"),
+        managed: true, executable: false, reason: `block:${block.id}:loot`,
+      });
+    }
     if (block.tool !== "none") {
       (mineable[block.tool] ??= []).push(`${ctx.vars.namespace}:${block.id}`);
     }
     out.langEntries[renderTemplate(ctx.adapter.langKeys.block, { namespace: ctx.vars.namespace!, id: block.id }, "langKeys.block")] = display;
   }
-  for (const [tool, values] of Object.entries(mineable)) {
-    // Match the template indent (tabs) so generated tag files stay consistently formatted.
-    const valuesJson = values.map((s) => `"${s}"`).join(",\n\t\t");
-    out.files.push({
-      path: renderPath(ctx.adapter.contentPaths.mineableTag, { ...ctx.vars, tool }, "contentPaths.mineableTag"),
-      content: renderTemplate(ctx.adapter.templates.mineableTag!, { ...ctx.vars, VALUES: valuesJson, tool }, "mineableTag"),
-      managed: true, executable: false, reason: `block:tags:mineable:${tool}`,
-    });
+  // The mineable tag is a slice, like UI/recipes/entities: a version that has no datapack tags
+  // expresses the harvest tool in code instead (see blockRegistration), so the tag is skipped
+  // rather than emitted as a file the game would ignore.
+  const tagTemplate = ctx.adapter.templates.mineableTag;
+  const tagPath = ctx.adapter.contentPaths.mineableTag;
+  if (tagTemplate !== undefined && tagPath !== undefined) {
+    for (const [tool, values] of Object.entries(mineable)) {
+      // Match the template indent (tabs) so generated tag files stay consistently formatted.
+      const valuesJson = values.map((s) => `"${s}"`).join(",\n\t\t");
+      out.files.push({
+        path: renderPath(tagPath, { ...ctx.vars, tool }, "contentPaths.mineableTag"),
+        content: renderTemplate(tagTemplate, { ...ctx.vars, VALUES: valuesJson, tool }, "mineableTag"),
+        managed: true, executable: false, reason: `block:tags:mineable:${tool}`,
+      });
+    }
   }
   return out;
 }

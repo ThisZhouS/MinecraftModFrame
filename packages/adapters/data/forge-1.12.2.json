@@ -1,0 +1,226 @@
+{
+  "id": "forge-1.12.2",
+  "mcVersion": "1.12.2",
+  "loader": "forge",
+  "loaderVersion": "14.23.5.2864",
+  "java": 8,
+  "mappings": "MCP snapshot_20171003-1.12 (ForgeGradle 'snapshot' channel)",
+  "basePackagePattern": "com.{{modId}}",
+  "mainClassSimpleName": "ModMain",
+  "gradleWrapperVersion": "4.10.3",
+  "gradle": {
+    "forgeGradleVersion": "3.+",
+    "forgeVersion": "14.23.5.2864",
+    "loaderVersionRange": "[14.23.5,)",
+    "minecraftVersionRange": "[1.12.2,1.13)",
+    "packFormat": 3,
+    "mappingChannel": "snapshot",
+    "mappingVersion": "20171003-1.12"
+  },
+  "vanillaGroups": {
+    "building_blocks": "CreativeTabs.BUILDING_BLOCKS",
+    "decorations": "CreativeTabs.DECORATIONS",
+    "redstone": "CreativeTabs.REDSTONE",
+    "transportation": "CreativeTabs.TRANSPORTATION",
+    "misc": "CreativeTabs.MISC",
+    "food": "CreativeTabs.FOOD",
+    "tools": "CreativeTabs.TOOLS",
+    "combat": "CreativeTabs.COMBAT",
+    "brewing": "CreativeTabs.BREWING",
+    "ingredients": "CreativeTabs.MATERIALS"
+  },
+  "assetFiles": [
+    {
+      "path": "gradlew",
+      "asset": "gradle-4.10.3/gradlew"
+    },
+    {
+      "path": "gradlew.bat",
+      "asset": "gradle-4.10.3/gradlew.bat"
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.jar",
+      "asset": "gradle-4.10.3/gradle/wrapper/gradle-wrapper.jar"
+    }
+  ],
+  "projectFiles": [
+    {
+      "path": "settings.gradle",
+      "template": "settingsGradle",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "build.gradle",
+      "template": "buildGradle",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "gradle.properties",
+      "template": "gradleProps",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.properties",
+      "template": "wrapperProps",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": ".gitignore",
+      "template": "gitignore",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "README.md",
+      "template": "projectReadme",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "src/main/resources/mcmod.info",
+      "template": "mcmodInfo",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "src/main/resources/pack.mcmeta",
+      "template": "packMcmeta",
+      "managed": true,
+      "executable": false
+    },
+    {
+      "path": "src/main/java/{{packagePath}}/{{mainClassSimpleName}}.java",
+      "template": "mainClass",
+      "managed": true,
+      "executable": false
+    }
+  ],
+  "templates": {
+    "settingsGradle": "rootProject.name = '{{modId}}'\n",
+    "buildGradle": "buildscript {\n\trepositories {\n\t\tmaven { url = 'https://maven.minecraftforge.net/' }\n\t\tmavenCentral()\n\t}\n\tdependencies {\n\t\tclasspath 'net.minecraftforge.gradle:ForgeGradle:{{gradle_forgeGradleVersion}}'\n\t}\n}\napply plugin: 'net.minecraftforge.gradle'\napply plugin: 'eclipse'\napply plugin: 'maven-publish'\n\nversion = '{{modVersion}}'\ngroup = '{{packageName}}'\narchivesBaseName = '{{modId}}'\n\nsourceCompatibility = targetCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = '{{javaVersion}}'\n\nminecraft {\n\tmappings channel: '{{gradle_mappingChannel}}', version: '{{gradle_mappingVersion}}'\n\n\truns {\n\t\tclient {\n\t\t\tworkingDirectory project.file('run')\n\t\t\tproperty 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'\n\t\t\tproperty 'forge.logging.console.level', 'debug'\n\t\t}\n\t\tserver {\n\t\t\tworkingDirectory project.file('run')\n\t\t\tproperty 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'\n\t\t\tproperty 'forge.logging.console.level', 'debug'\n\t\t}\n\t}\n}\n\ndependencies {\n\tminecraft 'net.minecraftforge:forge:{{mcVersion}}-{{gradle_forgeVersion}}'\n}\n\njar {\n\tmanifest {\n\t\tattributes(\n\t\t\t\t'Specification-Title': '{{modId}}',\n\t\t\t\t'Specification-Vendor': '{{authors}}',\n\t\t\t\t'Specification-Version': '1',\n\t\t\t\t'Implementation-Title': project.name,\n\t\t\t\t'Implementation-Version': project.version,\n\t\t\t\t'Implementation-Vendor': '{{authors}}',\n\t\t)\n\t}\n}\n",
+    "gradleProps": "# Gradle (this target needs a Java 8 daemon; Gradle 4.10.3 does not start on Java 9+)\norg.gradle.jvmargs=-Xmx2G\norg.gradle.parallel=true\n\n# Forge properties (https://files.minecraftforge.net/net/minecraftforge/forge/)\nminecraft_version={{mcVersion}}\nforge_version={{gradle_forgeVersion}}\nmapping_channel={{gradle_mappingChannel}}\nmapping_version={{gradle_mappingVersion}}\n\n# Mod properties\nmod_id={{modId}}\nmod_name={{modName}}\nmod_license={{license}}\nmod_version={{modVersion}}\nmod_group_id={{packageName}}\nmod_authors={{authors}}\nmod_description={{description}}\n",
+    "wrapperProps": "distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-{{gradleWrapperVersion}}-bin.zip\n",
+    "gitignore": ".gradle/\nbuild/\nrun/\nrun-data/\n.idea/\n*.iml\n",
+    "projectReadme": "# {{modName}}\n\nMinecraft {{mcVersion}} / Forge {{loaderVersion}} mod, generated by mcmodkit from a ModSpec.\n\n## Build\n\n```\ngradlew.bat build      # Windows\n./gradlew build        # macOS / Linux\n```\n\nThe mod jar is written to build/libs/. Requires JDK {{javaVersion}}; the bundled Gradle wrapper ({{gradleWrapperVersion}}) downloads dependencies on first run.\n\n{{TEXTURE_NOTES}}\n\n## Regenerating\n\nFiles listed in the mcmodkit plan are managed and overwritten on regeneration; anything else in this\nproject is never touched. Re-run `mcmod gen <spec.json> -o .` from the framework repository.\n",
+    "packMcmeta": "{\n\t\"pack\": {\n\t\t\"pack_format\": {{gradle_packFormat}},\n\t\t\"description\": \"{{modName}}\"\n\t}\n}\n",
+    "mainClass": "package {{packageName}};\n\nimport net.minecraft.util.ResourceLocation;\nimport net.minecraftforge.fml.common.Mod;\nimport net.minecraftforge.fml.common.event.FMLPreInitializationEvent;\nimport org.apache.logging.log4j.LogManager;\nimport org.apache.logging.log4j.Logger;\n\n/** Entry point of {{modName}} (generated by mcmodkit). */\n@Mod(modid = {{mainClassSimpleName}}.MOD_ID, name = \"{{modName}}\", version = \"{{modVersion}}\",\n\t\tacceptedMinecraftVersions = \"[{{mcVersion}}]\")\npublic class {{mainClassSimpleName}} {\n\n\tpublic static final String MOD_ID = \"{{modId}}\";\n\tpublic static final Logger LOGGER = LogManager.getLogger(MOD_ID);\n\n\t@Mod.EventHandler\n\tpublic void preInit(FMLPreInitializationEvent event) {\n\t\t{{mainClassSimpleName}}Items.init();\n\t\t{{mainClassSimpleName}}Blocks.init();\n{{REGISTRY_INIT_CALLS}}\n\t\tLOGGER.info(\"{} loaded\", MOD_ID);\n\t}\n\n\tpublic static ResourceLocation id(String path) {\n\t\treturn new ResourceLocation(MOD_ID, path);\n\t}\n}\n",
+    "itemsRegistryClass": "package {{packageName}};\n\nimport java.util.ArrayList;\nimport java.util.List;\n\nimport net.minecraft.creativetab.CreativeTabs;\nimport net.minecraft.init.Blocks;\nimport net.minecraft.item.Item;\nimport net.minecraft.item.ItemStack;\nimport net.minecraftforge.event.RegistryEvent;\nimport net.minecraftforge.fml.common.Mod;\nimport net.minecraftforge.fml.common.eventhandler.SubscribeEvent;\nimport net.minecraftforge.fml.relauncher.Side;\nimport net.minecraftforge.fml.relauncher.SideOnly;\n{{ITEM_BEHAVIOR_IMPORTS}}\n\n/** Items and creative tab of {{modName}} (generated by mcmodkit). */\n@Mod.EventBusSubscriber(modid = {{mainClassSimpleName}}.MOD_ID)\npublic final class {{mainClassSimpleName}}Items {\n\n\t/** Items shown in this mod's own tab; also the icon source. */\n\tprivate static final List<Item> TAB_ENTRIES = new ArrayList<>();\n\t/** Everything this mod registers, in registration order. */\n\tprivate static final List<Item> REGISTRY = new ArrayList<>();\n\n\tpublic static final CreativeTabs TAB = new CreativeTabs(\"{{namespace}}\") {\n\t\t@Override\n\t\t@SideOnly(Side.CLIENT)\n\t\tpublic ItemStack getTabIconItem() {\n\t\t\treturn TAB_ENTRIES.isEmpty() ? new ItemStack(Blocks.STONE) : new ItemStack(TAB_ENTRIES.get(0));\n\t\t}\n\t};\n\n{{ITEM_REGISTRATIONS}}\n\n\tprivate {{mainClassSimpleName}}Items() {\n\t}\n\n\tpublic static void init() {\n{{TAB_BLOCK}}\n{{ITEM_GROUP_HOOKS}}\n\t}\n\n\t/** Puts an item in this mod's tab. Called from init(), which runs before the game reads tabs. */\n\tpublic static void addToModTab(Item item) {\n\t\tTAB_ENTRIES.add(item);\n\t\titem.setCreativeTab(TAB);\n\t}\n\n\t@SubscribeEvent\n\tpublic static void onRegisterItems(RegistryEvent.Register<Item> event) {\n\t\tfor (Item item : REGISTRY) {\n\t\t\tevent.getRegistry().register(item);\n\t\t}\n\t}\n\n\tprivate static Item register(String name, Item item) {\n\t\titem.setRegistryName({{mainClassSimpleName}}.MOD_ID, name);\n\t\titem.setUnlocalizedName({{mainClassSimpleName}}.MOD_ID + \".\" + name);\n\t\tREGISTRY.add(item);\n\t\treturn item;\n\t}\n}\n",
+    "blocksRegistryClass": "package {{packageName}};\n\nimport java.util.ArrayList;\nimport java.util.List;\n\nimport net.minecraft.block.Block;\nimport net.minecraft.block.material.Material;\nimport net.minecraft.item.Item;\nimport net.minecraft.item.ItemBlock;\nimport net.minecraftforge.event.RegistryEvent;\nimport net.minecraftforge.fml.common.Mod;\nimport net.minecraftforge.fml.common.eventhandler.SubscribeEvent;\n\n/** Blocks of {{modName}} (generated by mcmodkit). Each block also gets a matching ItemBlock. */\n@Mod.EventBusSubscriber(modid = {{mainClassSimpleName}}.MOD_ID)\npublic final class {{mainClassSimpleName}}Blocks {\n\n\tprivate static final List<Block> REGISTRY = new ArrayList<>();\n\tprivate static final List<Item> BLOCK_ITEMS = new ArrayList<>();\n\n{{BLOCK_REGISTRATIONS}}\n\n\tprivate {{mainClassSimpleName}}Blocks() {\n\t}\n\n\tpublic static void init() {\n\t}\n\n\t@SubscribeEvent\n\tpublic static void onRegisterBlocks(RegistryEvent.Register<Block> event) {\n\t\tfor (Block block : REGISTRY) {\n\t\t\tevent.getRegistry().register(block);\n\t\t}\n\t}\n\n\t@SubscribeEvent\n\tpublic static void onRegisterBlockItems(RegistryEvent.Register<Item> event) {\n\t\tfor (Item item : BLOCK_ITEMS) {\n\t\t\tevent.getRegistry().register(item);\n\t\t}\n\t}\n\n\tstatic Block register(String name, Block block, String tool) {\n\t\tblock.setRegistryName({{mainClassSimpleName}}.MOD_ID, name);\n\t\tblock.setUnlocalizedName({{mainClassSimpleName}}.MOD_ID + \".\" + name);\n\t\tif (!\"none\".equals(tool)) {\n\t\t\t// Replaces the 1.13+ mineable block tag. Level 1 is the era's default for a plain block;\n\t\t\t// the ModSpec models the tool, not the tier.\n\t\t\tblock.setHarvestLevel(tool, 1);\n\t\t}\n\t\tREGISTRY.add(block);\n\t\treturn block;\n\t}\n\n\tstatic Item registerItem(Block block) {\n\t\tItemBlock item = new ItemBlock(block);\n\t\titem.setRegistryName(block.getRegistryName());\n\t\tBLOCK_ITEMS.add(item);\n\t\treturn item;\n\t}\n}\n",
+    "itemRegistration": "\tpublic static final Item {{CONST_UPPER}} = register(\"{{REG_NAME}}\", {{ITEM_CTOR}});",
+    "itemRegistrationGroup": "",
+    "itemSettings": "{{GROUP_SUFFIX}}{{DURABILITY_SUFFIX}}",
+    "itemSettingsMaxCount": ".setMaxStackSize({{MAX_COUNT}}){{GROUP_SUFFIX}}{{DURABILITY_SUFFIX}}",
+    "blockRegistration": "\tpublic static final Block {{CONST_UPPER}} = register(\"{{REG_NAME}}\", new Block({{SETTINGS}}).setHardness({{HARDNESS}}F).setResistance({{RESISTANCE}}F), \"{{tool}}\");\n\tpublic static final Item {{CONST_UPPER}}_ITEM = registerItem({{CONST_UPPER}});",
+    "blockSettings": "Material.ROCK",
+    "blockSettingsNoTool": "Material.ROCK",
+    "tabBlock": "{{TAB_ENTRIES}}",
+    "tabEntryLineItem": "\t\taddToModTab({{mainClassSimpleName}}Items.{{CONST_UPPER}});",
+    "tabEntryLineBlock": "\t\taddToModTab({{mainClassSimpleName}}Blocks.{{CONST_UPPER}}_ITEM);",
+    "blockState": "{\n\t\"variants\": {\n\t\t\"normal\": { \"model\": \"{{namespace}}:{{REG_NAME}}\" }\n\t}\n}\n",
+    "blockModel": "{\n\t\"parent\": \"block/cube_all\",\n\t\"textures\": {\n\t\t\"all\": \"{{namespace}}:blocks/{{REG_NAME}}\"\n\t}\n}\n",
+    "blockItemModel": "{\n\t\"parent\": \"{{namespace}}:block/{{REG_NAME}}\"\n}\n",
+    "itemModel": "{\n\t\"parent\": \"item/generated\",\n\t\"textures\": {\n\t\t\"layer0\": \"{{namespace}}:items/{{REG_NAME}}\"\n\t}\n}\n",
+    "itemModelHandheld": "{\n\t\"parent\": \"item/handheld\",\n\t\"textures\": {\n\t\t\"layer0\": \"{{namespace}}:items/{{REG_NAME}}\"\n\t}\n}\n",
+    "blockModelColumn": "{\n\t\"parent\": \"block/cube_column\",\n\t\"textures\": {\n\t\t\"end\": \"{{namespace}}:blocks/{{REG_NAME}}\",\n\t\t\"side\": \"{{namespace}}:blocks/{{REG_NAME}}\"\n\t}\n}\n",
+    "itemGroupSuffix": ".setCreativeTab({{GROUP_EXPR}})",
+    "itemDurabilitySuffix": ".setMaxDamage({{DURABILITY}})",
+    "mcmodInfo": "[\n\t{\n\t\t\"modid\": \"{{modId}}\",\n\t\t\"name\": \"{{modName}}\",\n\t\t\"description\": \"{{description}}\",\n\t\t\"version\": \"{{modVersion}}\",\n\t\t\"mcversion\": \"{{mcVersion}}\",\n\t\t\"url\": \"\",\n\t\t\"updateUrl\": \"\",\n\t\t\"authorList\": {{authorsJson}},\n\t\t\"credits\": \"Generated by mcmodkit\",\n\t\t\"logoFile\": \"\",\n\t\t\"screenshots\": [],\n\t\t\"dependencies\": []\n\t}\n]\n"
+  },
+  "contentPaths": {
+    "itemModel": "src/main/resources/assets/{{namespace}}/models/item/{{id}}.json",
+    "blockState": "src/main/resources/assets/{{namespace}}/blockstates/{{id}}.json",
+    "blockModel": "src/main/resources/assets/{{namespace}}/models/block/{{id}}.json",
+    "blockItemModel": "src/main/resources/assets/{{namespace}}/models/item/{{id}}.json",
+    "lang": "src/main/resources/assets/{{namespace}}/lang/en_us.json",
+    "itemTexture": "src/main/resources/assets/{{namespace}}/textures/items/{{id}}.png",
+    "blockTexture": "src/main/resources/assets/{{namespace}}/textures/blocks/{{id}}.png",
+    "entityTexture": "src/main/resources/assets/{{namespace}}/textures/entity/{{id}}.png"
+  },
+  "langKeys": {
+    "item": "item.{{namespace}}.{{id}}.name",
+    "block": "tile.{{namespace}}.{{id}}.name",
+    "itemGroup": "itemGroup.{{namespace}}"
+  },
+  "notes": [
+    "Forge 1.20.1 uses the pre-1.21 PLURAL datapack directories: data/<ns>/loot_tables/blocks/... and data/minecraft/tags/blocks/mineable/... The singular 1.21 names do not load here.",
+    "Mappings are Mojang official (channel 'official'); API names are mojmap (net.minecraft.world.item.Item), not MCP/yarn.",
+    "Mod metadata lives in src/main/resources/META-INF/mods.toml; the @Mod annotated class is discovered by scanning, so mods.toml does not name it.",
+    "Version facts: Forge 1.20.1 recommended 47.4.10 (files.minecraftforge.net promotions_slim.json), ForgeGradle 6.0.54, Gradle 8.8 wrapper as shipped by the official 47.4.10 MDK.",
+    "Textures are not generated: add 16x16 PNGs under assets/<ns>/textures/{item,block}/<id>.png.",
+    "Compile-verified trap: ItemLike is net.minecraft.world.level.ItemLike on 1.20.1 (verified with javap against the mapped Forge jar) and stays there on 1.21.1; net.minecraft.world.item.ItemLike does not exist on either version.",
+    "Compile-verified: ResourceLocation.fromNamespaceAndPath(namespace, path) exists in 1.20.1 and avoids the deprecated public ResourceLocation(String, String) constructor.",
+    "Registry lookups must not happen in register(): it runs from the mod constructor, before any RegisterEvent populates the DeferredRegister. TAB_ENTRIES therefore holds RegistryObject suppliers and resolves them lazily inside the creative-tab lambdas. Calling .get() there throws \"Registry Object not present: <ns>:<id>\" at load time.",
+    "com.mojang.logging.LogUtils is not in the 1.16.5 jar (1.17+); the mod class logs through org.apache.logging.log4j.LogManager. The @Mod class also takes a no-arg constructor and reaches the event bus through FMLJavaModLoadingContext.get() - constructor injection is much newer.",
+    "com.mojang.logging.LogUtils is not in the 1.16.5 jar (1.17+); the mod class logs through org.apache.logging.log4j.LogManager. The @Mod class takes a no-arg constructor and reaches the event bus through FMLJavaModLoadingContext.get() - constructor injection is much newer.",
+    "Derived from forge-1.16.5, re-fitted with facts from scripts/version-facts.mjs (loader 14.23.5.2864, pack_format ? read from the real game jar).",
+    "SCOPE: items + blocks + textures only. UI/recipes/advancements/entities/datagen are deliberately absent because their templates are not version-independent (1.21.2+ alone changed MobRenderer's arity and EntityType.Builder#build). Asking for them fails with a clear error rather than emitting broken Java.",
+    "This is the oldest target in the repo and shares almost nothing with the others. It uses MCP names, RegistryEvent.Register<T> instead of DeferredRegister, item setters (setMaxStackSize/setMaxDamage/setCreativeTab) instead of an Item.Properties object, mcmod.info instead of mods.toml, and MCP snapshot mappings instead of Mojang's.",
+    "1.12.2 has NO datapack tags and NO block loot tables (tags are 1.13+, block loot tables 1.14+). This adapter therefore declares neither, so the generator emits neither: the harvest tool is set in code with Block#setHarvestLevel, and a plain Block drops itself with no data file.",
+    "Resources live under assets/<namespace>/, not data/<namespace>/ (data packs are 1.13+), texture directories are PLURAL (textures/items/, textures/blocks/ - singular from 1.13), and model parents carry no \"minecraft:\" prefix. All read from the real 1.12.2 client jar.",
+    "Lang keys are item.<name>.name and tile.<name>.name: Item.getUnlocalizedName() prepends \"item.\", Block's prepends \"tile.\", and ItemStack appends \".name\". The block's ItemBlock inherits the block's key, so one entry covers both.",
+    "Toolchain: ForgeGradle 3 (the official 1.12.x MDK uses 3.+, not 2.3) with the Gradle 4.10.3 wrapper and a Java 8 daemon - Gradle 4.10.3 does not start on Java 9+. ForgeGradle 6 cannot build this version (it fails inside its own toolchain handling on Gradle 8), and ForgeGradle 2.3 cannot either: Forge no longer publishes a -userdev.jar for 1.12.2.",
+    "This is the oldest target in the repo and shares almost nothing with the others. It uses MCP names, RegistryEvent.Register<T> instead of DeferredRegister, item setters (setMaxStackSize/setMaxDamage/setCreativeTab) instead of an Item.Properties object, mcmod.info instead of mods.toml, and MCP snapshot mappings instead of Mojang's.",
+    "1.12.2 has NO datapack tags and NO block loot tables (tags are 1.13+, block loot tables 1.14+). This adapter therefore declares neither, so the generator emits neither: the harvest tool is set in code with Block#setHarvestLevel, and a plain Block drops itself with no data file.",
+    "Resources live under assets/<namespace>/, not data/<namespace>/ (data packs are 1.13+), texture directories are PLURAL (textures/items/, textures/blocks/ - singular from 1.13), and model parents carry no \"minecraft:\" prefix. All read from the real 1.12.2 client jar.",
+    "Lang keys are item.<name>.name and tile.<name>.name: Item.getUnlocalizedName() prepends \"item.\", Block's prepends \"tile.\", and ItemStack appends \".name\". The block's ItemBlock inherits the block's key, so one entry covers both.",
+    "Toolchain: ForgeGradle 3 (the official 1.12.x MDK uses 3.+, not 2.3) with the Gradle 4.10.3 wrapper and a Java 8 daemon - Gradle 4.10.3 does not start on Java 9+. ForgeGradle 6 cannot build this version (it fails inside its own toolchain handling on Gradle 8), and ForgeGradle 2.3 cannot either: Forge no longer publishes a -userdev.jar for 1.12.2.",
+    "This is the oldest target in the repo and shares almost nothing with the others. It uses MCP names, RegistryEvent.Register<T> instead of DeferredRegister, item setters (setMaxStackSize/setMaxDamage/setCreativeTab) instead of an Item.Properties object, mcmod.info instead of mods.toml, and MCP snapshot mappings instead of Mojang's.",
+    "1.12.2 has NO datapack tags and NO block loot tables (tags are 1.13+, block loot tables 1.14+). This adapter therefore declares neither, so the generator emits neither: the harvest tool is set in code with Block#setHarvestLevel, and a plain Block drops itself with no data file.",
+    "Resources live under assets/<namespace>/, not data/<namespace>/ (data packs are 1.13+), texture directories are PLURAL (textures/items/, textures/blocks/ - singular from 1.13), and model parents carry no \"minecraft:\" prefix. All read from the real 1.12.2 client jar.",
+    "Lang keys are item.<name>.name and tile.<name>.name: Item.getUnlocalizedName() prepends \"item.\", Block's prepends \"tile.\", and ItemStack appends \".name\". The block's ItemBlock inherits the block's key, so one entry covers both.",
+    "Toolchain: ForgeGradle 3 (the official 1.12.x MDK uses 3.+, not 2.3) with the Gradle 4.10.3 wrapper and a Java 8 daemon - Gradle 4.10.3 does not start on Java 9+. ForgeGradle 6 cannot build this version (it fails inside its own toolchain handling on Gradle 8), and ForgeGradle 2.3 cannot either: Forge no longer publishes a -userdev.jar for 1.12.2.",
+    "This is the oldest target in the repo and shares almost nothing with the others. It uses MCP names, RegistryEvent.Register<T> instead of DeferredRegister, item setters (setMaxStackSize/setMaxDamage/setCreativeTab) instead of an Item.Properties object, mcmod.info instead of mods.toml, and MCP snapshot mappings instead of Mojang's.",
+    "1.12.2 has NO datapack tags and NO block loot tables (tags are 1.13+, block loot tables 1.14+). This adapter therefore declares neither, so the generator emits neither: the harvest tool is set in code with Block#setHarvestLevel, and a plain Block drops itself with no data file.",
+    "Resources live under assets/<namespace>/, not data/<namespace>/ (data packs are 1.13+), texture directories are PLURAL (textures/items/, textures/blocks/ - singular from 1.13), and model parents carry no \"minecraft:\" prefix. All read from the real 1.12.2 client jar.",
+    "Lang keys are item.<name>.name and tile.<name>.name: Item.getUnlocalizedName() prepends \"item.\", Block's prepends \"tile.\", and ItemStack appends \".name\". The block's ItemBlock inherits the block's key, so one entry covers both.",
+    "Toolchain: ForgeGradle 3 (the official 1.12.x MDK uses 3.+, not 2.3) with the Gradle 4.10.3 wrapper and a Java 8 daemon - Gradle 4.10.3 does not start on Java 9+. ForgeGradle 6 cannot build this version (it fails inside its own toolchain handling on Gradle 8), and ForgeGradle 2.3 cannot either: Forge no longer publishes a -userdev.jar for 1.12.2.",
+    "This is the oldest target in the repo and shares almost nothing with the others. It uses MCP names, RegistryEvent.Register<T> instead of DeferredRegister, item setters (setMaxStackSize/setMaxDamage/setCreativeTab) instead of an Item.Properties object, mcmod.info instead of mods.toml, and MCP snapshot mappings instead of Mojang's.",
+    "1.12.2 has NO datapack tags and NO block loot tables (tags are 1.13+, block loot tables 1.14+). This adapter therefore declares neither, so the generator emits neither: the harvest tool is set in code with Block#setHarvestLevel, and a plain Block drops itself with no data file.",
+    "Resources live under assets/<namespace>/, not data/<namespace>/ (data packs are 1.13+), texture directories are PLURAL (textures/items/, textures/blocks/ - singular from 1.13), and model parents carry no \"minecraft:\" prefix. All read from the real 1.12.2 client jar.",
+    "Lang keys are item.<name>.name and tile.<name>.name: Item.getUnlocalizedName() prepends \"item.\", Block's prepends \"tile.\", and ItemStack appends \".name\". The block's ItemBlock inherits the block's key, so one entry covers both.",
+    "Toolchain: ForgeGradle 3 (the official 1.12.x MDK uses 3.+, not 2.3) with the Gradle 4.10.3 wrapper and a Java 8 daemon - Gradle 4.10.3 does not start on Java 9+. ForgeGradle 6 cannot build this version (it fails inside its own toolchain handling on Gradle 8), and ForgeGradle 2.3 cannot either: Forge no longer publishes a -userdev.jar for 1.12.2."
+  ],
+  "itemBehaviors": {
+    "plain": "new Item(){{SETTINGS}}",
+    "fishing_rod": "new ItemFishingRod(){{SETTINGS}}"
+  },
+  "itemBehaviorImports": {
+    "fishing_rod": "net.minecraft.item.ItemFishingRod"
+  },
+  "references": [
+    {
+      "label": "Forge 官方文档",
+      "url": "https://mcforge.readthedocs.io/en/latest/",
+      "kind": "official-docs",
+      "note": "权威来源：DeferredRegister、事件、数据生成"
+    },
+    {
+      "label": "ForgeGradle 6 迁移指南",
+      "url": "https://gist.github.com/ChampionAsh5357/98b08c117cb2057d8029a8919c378a4c",
+      "kind": "migration",
+      "note": "本适配器钉 Gradle 8.8 的原因（ForgeGradle 6 不兼容 Gradle 9）"
+    },
+    {
+      "label": "1.19.4 -> 1.20 迁移指南",
+      "url": "https://gist.github.com/ChampionAsh5357/cf818acc53ffea6f4387fe28c2977d56",
+      "kind": "migration",
+      "note": "ChampionAsh5357 逐版本迁移笔记，高版本同样适用"
+    },
+    {
+      "label": "Forge 官方下载",
+      "url": "https://files.minecraftforge.net/",
+      "kind": "official-docs",
+      "note": "核对 loaderVersion 与 MC 版本对应关系"
+    },
+    {
+      "label": "Linkie 映射表查询",
+      "url": "https://linkie.shedaniel.dev/mappings",
+      "kind": "mappings",
+      "note": "查 mojmap 对应名，写模板前核对签名"
+    }
+  ]
+}

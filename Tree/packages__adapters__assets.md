@@ -4,5 +4,6 @@
 
 ## 内容
 
+- `packages/adapters/assets/gradle-4.10.3`
 - `packages/adapters/assets/gradle-8.8`
 - `packages/adapters/assets/gradle-9.5.1`

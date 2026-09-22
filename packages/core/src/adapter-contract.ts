@@ -28,8 +28,16 @@ export const ContentPathsSpec = z.object({
   blockState: z.string(),
   blockModel: z.string(),
   blockItemModel: z.string(),
-  lootTable: z.string(),
-  mineableTag: z.string(),
+  /**
+   * Optional: block loot tables are 1.14+. Before that a plain Block drops itself with no data file.
+   */
+  lootTable: z.string().optional(),
+  /**
+   * Optional: mineable tags are 1.13+. A version without datapack tags expresses the harvest tool
+   * in code instead (Block#setHarvestLevel), so the slice is skipped rather than emitting a file
+   * the game would ignore. Declaring one of {template, path} without the other is a lint error.
+   */
+  mineableTag: z.string().optional(),
   lang: z.string(),
   /** Optional: required only by adapters that support content.recipes. */
   recipe: z.string().optional(),
@@ -104,8 +112,6 @@ export const REQUIRED_TEMPLATE_KEYS = [
   "blockModel",
   "blockItemModel",
   "itemModel",
-  "lootTable",
-  "mineableTag",
 ] as const;
 
 /**
@@ -266,6 +272,9 @@ const REQUIRED_PLACEHOLDERS: Record<string, string[]> = {
   blockItemModel: ["{{REG_NAME}}"],
   itemModel: ["{{REG_NAME}}"],
   mineableTag: ["{{VALUES}}"],
+  // {{DURABILITY}} rather than a hard-coded ".durability(n)": the setter's name is version-specific
+  // (Item#setMaxDamage before 1.13, Item.Properties#durability after), so the engine must not own it.
+  itemDurabilitySuffix: ["{{DURABILITY}}"],
   itemsRegistryClass: ["{{ITEM_REGISTRATIONS}}"],
   blocksRegistryClass: ["{{BLOCK_REGISTRATIONS}}"],
   // UI templates (present only on screen-capable adapters).
@@ -405,6 +414,16 @@ export function lintAdapter(a: AdapterRecordT): string[] {
     if (!p.includes("{{id}}")) problems.push(`contentPaths.${key} must contain {{id}} or every texture overwrites the same file`);
     if (!p.includes("{{namespace}}")) problems.push(`contentPaths.${key} must contain {{namespace}}`);
     if (!p.endsWith(".png")) problems.push(`contentPaths.${key} must end in .png`);
+  }
+  // Same all-or-nothing reasoning as textures: a template without a path (or vice versa) means the
+  // generator either writes to an undefined path or silently drops the tag.
+  for (const slice of ["mineableTag", "lootTable"] as const) {
+    if ((a.templates[slice] === undefined) !== (a.contentPaths[slice] === undefined)) {
+      problems.push(
+        `adapter must declare templates.${slice} and contentPaths.${slice} together or not at all ` +
+          "(a version without that data file expresses the behaviour in code instead)",
+      );
+    }
   }
   for (const [key, wanted] of Object.entries(REQUIRED_PLACEHOLDERS)) {
     const body = a.templates[key];

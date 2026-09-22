@@ -78,6 +78,48 @@ describe("lintAdapter", () => {
     expect(lintAdapter(b)).toEqual([]);
   });
 
+  // Regression: 1.12.2 has no datapack tags (1.13+) and no block loot tables (1.14+). Dropping both
+  // the template and the path is how an adapter says "this version has no such file", and the
+  // generator must then emit nothing rather than writing to an undefined path.
+  it("skips the loot-table and mineable-tag slices when the adapter does not declare them", () => {
+    const a = makeFixtureAdapter();
+    delete (a.templates as Record<string, unknown>).lootTable;
+    delete (a.contentPaths as Record<string, unknown>).lootTable;
+    delete (a.templates as Record<string, unknown>).mineableTag;
+    delete (a.contentPaths as Record<string, unknown>).mineableTag;
+    expect(lintAdapter(a)).toEqual([]);
+
+    const p = planGeneration(parseSpecOrThrow(SPEC), a);
+    const paths = p.files.map((f) => f.path);
+    expect(paths.some((x) => x.includes("loot_table"))).toBe(false);
+    expect(paths.some((x) => x.includes("mineable"))).toBe(false);
+    // The blocks themselves are still emitted.
+    expect(paths.some((x) => x.endsWith("ModMainBlocks.java"))).toBe(true);
+  });
+
+  it("rejects declaring only half of a data-file slice", () => {
+    const a = makeFixtureAdapter();
+    delete (a.contentPaths as Record<string, unknown>).mineableTag;
+    expect(lintAdapter(a).join("\n")).toMatch(/templates\.mineableTag and contentPaths\.mineableTag together/);
+  });
+
+  // Durability's setter name is version-specific (Item.Properties#durability from 1.13,
+  // Item#setMaxDamage before that), so the engine asks the adapter rather than assuming one.
+  it("asks the adapter how to express durability instead of hard-coding a setter", () => {
+    const a = makeFixtureAdapter();
+    a.templates.itemDurabilitySuffix = ".setMaxDamage({{DURABILITY}})";
+    a.templates.itemSettings = "Settings.DEFAULT{{DURABILITY_SUFFIX}}";
+    const p = planGeneration(parseSpecOrThrow({ ...SPEC, content: { items: [{ id: "mk2", durability: 128 }], blocks: [] } }), a);
+    expect(p.files.find((f) => f.path.endsWith("ModMainItems.java"))!.content).toContain("Settings.DEFAULT.setMaxDamage(128)");
+  });
+
+  it("fails loudly when the spec wants durability the adapter cannot express", () => {
+    const a = makeFixtureAdapter();
+    delete (a.templates as Record<string, unknown>).itemDurabilitySuffix;
+    const spec = parseSpecOrThrow({ ...SPEC, content: { items: [{ id: "mk2", durability: 128 }], blocks: [] } });
+    expect(() => planGeneration(spec, a)).toThrow(/does not offer item durability/);
+  });
+
   // references are how an agent finds the authoritative source for a version fact it is missing.
   // A malformed or duplicated list is worse than none: it looks authoritative while being wrong.
   it("rejects a duplicate reference url", () => {

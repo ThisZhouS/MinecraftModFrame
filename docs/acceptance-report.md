@@ -316,3 +316,55 @@ BUILD SUCCESSFUL in 21s
 3. **Forge 1.16.5 的 MCP 命名是工具链行为，不是我们的选择**：若上游 ForgeGradle 改变该行为，
    该适配器需重新取证。已写进 `notes` 与 `docs/adding-a-version.md` §2.5。
 4. **`fabric-datagen` entrypoint** 在 1.16 模板中被移除（该 entrypoint 是 1.17+）。
+
+## 15. L4 真编译（五）：1.12.2（本轮新增，又一代际）
+
+### 15.1 命令与结果
+
+```bash
+node scripts/smoke-spec.mjs .probe112/spec-1122.json 1.12.2 forge
+node packages/cli/dist/index.js gen .probe112/spec-1122.json -o .probe112/gen
+JAVA_HOME=<jdk8> <gradle-4.10.3>/bin/gradle -p .probe112/gen/examplemod build
+```
+```
+> Task :compileJava
+> Task :reobfJar
+> Task :build
+BUILD SUCCESSFUL in 28s
+```
+
+### 15.2 上游事实：1.12.2 没有 Fabric
+
+`meta.fabricmc.net/v2/versions/loader/1.12.2` → **HTTP 400**；Fabric API 无任何 1.12 构建。
+Fabric 从 1.14 开始。**该目标只有 Forge，这是上游事实不是框架缺口。**
+
+### 15.3 工具链取证（三条路只走通一条）
+
+| 路线 | 结果 | 证据 |
+| --- | --- | --- |
+| ForgeGradle 6 + Gradle 8.8 | ❌ | FG6 内部 `Project services has been closed` / `DefaultToolchainSpec` 实例化失败 |
+| ForgeGradle 2.3 + Gradle 4.10.3 | ❌ | `forge-1.12.2-*.userdev.jar` 在 Forge maven 全站 **404**（只有 `-universal.jar` / `-sources.jar`） |
+| **ForgeGradle 3 + Gradle 4.10.3 + JDK 8** | ✅ | 官方 `MinecraftForge/MinecraftForge` 分支 `1.12.x` 的 `mdk/build.gradle` 用的就是 `ForgeGradle:3.+` |
+
+### 15.4 由真编译/取证发现并修复的缺陷
+
+| 缺陷 | 发现方式 | 处理 |
+| --- | --- | --- |
+| 引擎硬编码 `.durability(n)`（1.13+ 的 API 名） | 1.12.2 需要 `.setMaxDamage(n)` | 契约新增 `itemDurabilitySuffix` 模板；引擎不再认识任何 MC API 名 |
+| 引擎无条件产出方块战利品表 | 真实 1.12.2 jar 的 `loot_tables/` 只有 chests/entities/gameplay | `lootTable` 改为可选切片（1.14+） |
+| 引擎无条件产出 mineable 标签 | 1.12.2 无 `tags/`（1.13+） | `mineableTag` 改为可选切片；lint 强制 templates/contentPaths 成对 |
+| `{{tool}}`/`{{HARDNESS}}` 只在 settings 渲染时可用 | `setHarvestLevel` 返回 void，不能链式，必须在注册函数里调用 | 这三个变量提升到方块的通用变量集 |
+| `minecraft { runDir 'run' }` 在 FG3 上不存在 | 构建报 `Could not find method runDir()` | 改为 FG3 的 `runs { client {...} }` |
+| `Items.STONE` 在 1.12.2 不存在（物品/方块注册表 1.13 才合并） | 编译器 | 改用 `Blocks.STONE` |
+| `Material` 未导入 | 编译器 | 补 `net.minecraft.block.material.Material` |
+| 模板注释里硬编码了 `1.12.2` | 既有测试「模板不得硬编码自身 MC 版本」 | 改写注释 |
+
+### 15.5 没做到的部分（如实标注）
+
+1. **运行期一律未验证**：只做到「产出 jar」。`@Mod.EventBusSubscriber` 是否确实收到
+   `RegistryEvent`、自定义 `CreativeTabs` 是否出现在创造模式界面、ItemBlock 是否继承方块的
+   本地化键——**都是代码路径推理 + javap/字节码证据，不是运行证据**。
+2. **1.12.2 只覆盖 items + blocks + textures**：UI/配方/进度/实体/datagen 切片未移植。
+3. **采集等级固定为 1**：ModSpec 只建模「用什么工具」，不建模「什么等级」，1.12.2 需要等级参数，
+   适配器取了该年代普通方块的默认值 1。已在 `notes` 里写明。
+4. **Fabric 侧无对应目标**，非本框架所能补。

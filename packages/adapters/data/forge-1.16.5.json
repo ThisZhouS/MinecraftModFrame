@@ -123,7 +123,8 @@
     "mineableTag": "{\n\t\"replace\": false,\n\t\"values\": [\n\t\t{{VALUES}}\n\t]\n}\n",
     "itemModelHandheld": "{\n\t\"parent\": \"minecraft:item/handheld\",\n\t\"textures\": {\n\t\t\"layer0\": \"{{namespace}}:item/{{REG_NAME}}\"\n\t}\n}\n",
     "blockModelColumn": "{\n\t\"parent\": \"minecraft:block/cube_column\",\n\t\"textures\": {\n\t\t\"end\": \"{{namespace}}:block/{{REG_NAME}}\",\n\t\t\"side\": \"{{namespace}}:block/{{REG_NAME}}\"\n\t}\n}\n",
-    "itemGroupSuffix": ".tab({{GROUP_EXPR}})"
+    "itemGroupSuffix": ".tab({{GROUP_EXPR}})",
+    "itemDurabilitySuffix": ".durability({{DURABILITY}})"
   },
   "contentPaths": {
     "itemModel": "src/main/resources/assets/{{namespace}}/models/item/{{id}}.json",

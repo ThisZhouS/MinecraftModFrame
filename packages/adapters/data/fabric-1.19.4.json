@@ -123,7 +123,8 @@
     "packMcmeta": "{\n\t\"pack\": {\n\t\t\"pack_format\": {{gradle_packFormat}},\n\t\t\"description\": \"{{modName}}\"\n\t}\n}\n",
     "fabricModJson": "{\n\t\"schemaVersion\": 1,\n\t\"id\": \"{{modId}}\",\n\t\"version\": \"${version}\",\n\t\"name\": \"{{modName}}\",\n\t\"description\": {{descriptionJson}},\n\t\"authors\": {{authorsJson}},\n\t\"license\": \"{{license}}\",\n\t\"environment\": \"*\",\n\t\"entrypoints\": {\n\t\t\"main\": [\n\t\t\t\"{{mainClassFq}}\"\n\t\t],\n\t\t\"client\": [\n\t\t\t{{clientEntrypointJson}}\n\t\t],\n\t\t\"fabric-datagen\": [\n\t\t\t{{datagenEntrypointJson}}\n\t\t]\n\t},\n\t\"depends\": {\n\t\t\"fabricloader\": \">={{loaderVersion}}\",\n\t\t\"minecraft\": \"~{{mcVersion}}\",\n\t\t\"java\": \">={{javaVersion}}\",\n\t\t\"fabric-api\": \"*\"\n\t}\n}\n",
     "itemModelHandheld": "{\n\t\"parent\": \"minecraft:item/handheld\",\n\t\"textures\": {\n\t\t\"layer0\": \"{{namespace}}:item/{{REG_NAME}}\"\n\t}\n}\n",
-    "blockModelColumn": "{\n\t\"parent\": \"minecraft:block/cube_column\",\n\t\"textures\": {\n\t\t\"end\": \"{{namespace}}:block/{{REG_NAME}}\",\n\t\t\"side\": \"{{namespace}}:block/{{REG_NAME}}\"\n\t}\n}\n"
+    "blockModelColumn": "{\n\t\"parent\": \"minecraft:block/cube_column\",\n\t\"textures\": {\n\t\t\"end\": \"{{namespace}}:block/{{REG_NAME}}\",\n\t\t\"side\": \"{{namespace}}:block/{{REG_NAME}}\"\n\t}\n}\n",
+    "itemDurabilitySuffix": ".durability({{DURABILITY}})"
   },
   "contentPaths": {
     "itemModel": "src/main/resources/assets/{{namespace}}/models/item/{{id}}.json",

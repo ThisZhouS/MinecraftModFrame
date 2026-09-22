@@ -125,7 +125,8 @@
     "lootTable": "{\n\t\"type\": \"minecraft:block\",\n\t\"pools\": [\n\t\t{\n\t\t\t\"rolls\": 1,\n\t\t\t\"bonus_rolls\": 0,\n\t\t\t\"entries\": [\n\t\t\t\t{\n\t\t\t\t\t\"type\": \"minecraft:item\",\n\t\t\t\t\t\"name\": \"{{namespace}}:{{REG_NAME}}\"\n\t\t\t\t}\n\t\t\t],\n\t\t\t\"conditions\": [\n\t\t\t\t{ \"condition\": \"minecraft:survives_explosion\" }\n\t\t\t]\n\t\t}\n\t]\n}\n",
     "mineableTag": "{\n\t\"replace\": false,\n\t\"values\": [\n\t\t{{VALUES}}\n\t]\n}\n",
     "itemModelHandheld": "{\n\t\"parent\": \"minecraft:item/handheld\",\n\t\"textures\": {\n\t\t\"layer0\": \"{{namespace}}:item/{{REG_NAME}}\"\n\t}\n}\n",
-    "blockModelColumn": "{\n\t\"parent\": \"minecraft:block/cube_column\",\n\t\"textures\": {\n\t\t\"end\": \"{{namespace}}:block/{{REG_NAME}}\",\n\t\t\"side\": \"{{namespace}}:block/{{REG_NAME}}\"\n\t}\n}\n"
+    "blockModelColumn": "{\n\t\"parent\": \"minecraft:block/cube_column\",\n\t\"textures\": {\n\t\t\"end\": \"{{namespace}}:block/{{REG_NAME}}\",\n\t\t\"side\": \"{{namespace}}:block/{{REG_NAME}}\"\n\t}\n}\n",
+    "itemDurabilitySuffix": ".durability({{DURABILITY}})"
   },
   "contentPaths": {
     "itemModel": "src/main/resources/assets/{{namespace}}/models/item/{{id}}.json",

@@ -168,3 +168,19 @@ java.lang.NullPointerException: Registry Object not present: mk2:mk2
   新版在注册后挂钩（`ItemGroupEvents`）。哪一种是适配器数据，引擎不做版本分支。
 - lint 新增 `var` 检查：Java 10 以下目标出现 `var` 直接报错——javac 把它报成「找不到符号: 类 var」。
 - 验收：109 项测试通过；`fabric-1.16.5` 与 `forge-1.16.5` 生成工程均 **BUILD SUCCESSFUL** 并产出 jar。
+
+## S17 交付物（1.12.2，已完成）
+
+- **先确认上游**：Fabric 无 1.12.2（loader API 返回 400、无 Fabric API 构建）⇒ 该版本只有 Forge 目标。
+- `packages/adapters/assets/gradle-4.10.3/`：新增 wrapper 资产（本仓库唯一一个 Gradle 4 目标，
+  也是唯一需要 Java 8 守护进程的）。附 `PROVENANCE.md` 说明来源与为何需要。
+- `packages/adapters/data/forge-1.12.2.json`：按 1.12 年代重写——`RegistryEvent.Register` 注册、
+  setter 式物品配置、`mcmod.info`、`assets/` 下的复数贴图目录、`item.<n>.name` / `tile.<n>.name` 语言键。
+- **契约新增两个可选切片**：`lootTable`（1.14+）与 `mineableTag`（1.13+）。
+  不声明即跳过，声明则必须成对（lint 强制）。1.12.2 用 `Block#setHarvestLevel` 在代码里表达采集工具。
+- **契约修正**：`itemDurabilitySuffix` 模板取代引擎里硬编码的 `.durability(n)`——
+  那是 Mojang 1.13+ 的 API 名，1.12.2 是 `.setMaxDamage(n)`。引擎现在不认识任何 MC API 名。
+- 工具链取证结论：**ForgeGradle 3（官方 1.12.x MDK 用的就是它，不是 2.3）+ Gradle 4.10.3 + JDK 8**；
+  FG6 在该版本挂掉，FG2.3 因 Forge 不再发布 `-userdev.jar` 而无法使用。
+- 验收：生成工程 **BUILD SUCCESSFUL** 并产出 jar；全套 113 项测试通过；
+  fabric-1.16.5 / forge-1.16.5 复验仍通过（引擎改动无回归）。

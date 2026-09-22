@@ -45,6 +45,7 @@ MCP 工具**不执行任何 shell/构建命令**：构建由使用方自行决�
 
 | 适配器 | MC | 加载器 | Java | 状态 |
 | --- | --- | --- | --- | --- |
+| `forge-1.12.2` | 1.12.2 | Forge (14.23.5.2864, ForgeGradle 3.+, Gradle 4.10.3) | 8 | ✅ **真编译通过**（产出 jar；MCP 名 + 无标签/无战利品表，见下） |
 | `fabric-1.16.5` | 1.16.5 | Fabric (loader 0.19.5) | 8 | ✅ **真编译通过**（产出 jar） |
 | `fabric-1.19.4` | 1.19.4 | Fabric (loader 0.19.5) | 17 | ✅ **真编译通过**（产出 jar） |
 | `fabric-1.20.4` | 1.20.4 | Fabric (loader 0.19.5) | 17 | ✅ **真编译通过**（产出 jar） |
@@ -62,6 +63,11 @@ MCP 工具**不执行任何 shell/构建命令**：构建由使用方自行决�
 **注意 `forge-1.16.5` 用的是 MCP 名**（`net.minecraft.item.Item`），其余目标用 Mojang 官方名——
 这不是笔误：ForgeGradle 在该版本产出的构件虽然叫 `..._mapped_official_1.16.5.jar`，内容却是 MCP 命名。
 判据一律是 `javap` 真实构件，不是构件名。详见 `docs/adding-a-version.md` §2.5。
+
+**`forge-1.12.2` 没有对应的 Fabric 目标，这是上游事实不是缺口**：Fabric 从 1.14 才开始，
+`meta.fabricmc.net` 对 1.12.2 返回 400，Fabric API 也没有任何 1.12 构建。
+该版本还缺 1.13+ 才有的数据包标签与 1.14+ 才有的方块战利品表，所以适配器**不声明**这两类文件，
+生成器直接跳过（而不是产出游戏会忽略的文件）——采集工具改由 `Block#setHarvestLevel` 在代码里表达。
 
 新增一个目标 = 新增 `packages/adapters/data/<loader>-<mcVersion>.json`（可用 `mcmod adapter <id> --templates` 参考现有适配器），无需改动引擎。
 

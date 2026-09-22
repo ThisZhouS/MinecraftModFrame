@@ -101,6 +101,7 @@ cp packages/adapters/data/<loader>-<oldVersion>.json packages/adapters/data/<loa
 | 1.20.4 fabric/forge | 1.21.1 / 1.20.1 | ✅ 编译通过（一处 `ResourceLocation` 差异） |
 | **1.19.4** | 1.20.4 | ✅ 编译通过（**按年代重写**后，见下） |
 | **1.16.5** fabric/forge | 1.19.4 | ✅ 编译通过（**整套模板按年代重写**，见下） |
+| **1.12.2** forge | 1.16.5 | ✅ 编译通过（**又一代际，几乎无共同点**；Fabric 无此版本，见下） |
 
 ### 1.16.5：不是修几处，是整套重写（两个加载器均已完成）
 
@@ -149,6 +150,47 @@ net.minecraft.world.item.Item                                        ← 不存�
   不需要退回 ForgeGradle 3 / 老 Gradle。
 - **`version-facts.mjs` 的 `+<mc>` 后缀回落是对的**：1.16.5 的 Fabric API 写作 `0.42.0+1.16`，
   按 major.minor 回落即可命中，无需读聚合器 POM。
+
+### 1.12.2：又一代际，几乎无共同点
+
+**先确认上游是否存在**：Fabric 从 1.14 才有，`meta.fabricmc.net/v2/versions/loader/1.12.2` 返回 **400**，
+Fabric API 也没有任何 1.12 构建 ⇒ **1.12.2 只有 Forge**。这不是框架缺口，是上游事实。
+
+与 1.13+ 的差异是全面的，逐条取证后重写：
+
+- **注册方式**：`RegistryEvent.Register<T>` + `@Mod.EventBusSubscriber`，不是 `DeferredRegister`。
+  `javap` 确认 `Mod$EventBusSubscriber` 只有 `{value, modid}`（没有 bus 选择器），
+  而 `GameData` 把 `RegistryEvent` post 到 `MinecraftForge.EVENT_BUS` ⇒ 默认配对就是对的。
+- **物品配置**：用 setter（`setMaxStackSize` / `setMaxDamage` / `setCreativeTab`，都返回 `Item` 可链式），
+  没有 `Item.Properties`。**但 `Block#setHarvestLevel(String,int)` 返回 void**，不能链式，
+  所以它在注册函数里调用，而不是放进 settings。
+- **没有数据包标签（1.13+）也没有方块战利品表（1.14+）**。适配器**不声明**这两类文件，
+  生成器跳过；采集工具由 `setHarvestLevel` 在代码里表达，普通方块自带掉落、无需数据文件。
+  这是契约新增的「可选切片」：`templates` 与 `contentPaths` 必须同进同退（lint 强制）。
+- **元数据是 `mcmod.info` 不是 `mods.toml`**（1.13+）。
+- **资源在 `assets/<ns>/` 下，不是 `data/<ns>/`**（数据包是 1.13+）；贴图目录是**复数**
+  `textures/items/`、`textures/blocks/`（1.13 起变单数）；模型 `parent` **不带 `minecraft:` 前缀**。
+  全部读真实 1.12.2 client jar 取证。
+- **语言键是 `item.<name>.name` 和 `tile.<name>.name`**：`Item.getUnlocalizedName()` 前缀 `item.`，
+  `Block` 的是 `tile.`，`ItemStack` 再补 `.name`。方块的 ItemBlock 继承方块的键，一条覆盖两者。
+- **`Items.STONE` 不存在**：1.12.2 的物品/方块注册表还没合并（1.13 才合并），石头是 `Blocks.STONE`。
+  编译器抓到的。
+- 创造模式标签页是 `CreativeTabs`，`getTranslatedTabLabel()` 是 `"itemGroup." + label`（字节码确认），
+  与 `langKeys.itemGroup` 一致。
+
+**工具链是这个版本最大的坑**，三条路试了才知道哪条能走：
+
+| 路线 | 结果 |
+| --- | --- |
+| ForgeGradle 6 + Gradle 8.8 | ❌ FG6 在自己的工具链处理里挂掉（`Project services has been closed`） |
+| ForgeGradle 2.3 + Gradle 4.10.3 | ❌ Forge 已不再为 1.12.2 发布 `-userdev.jar`（全站 404） |
+| **ForgeGradle 3 + Gradle 4.10.3 + JDK 8** | ✅ **官方 1.12.x MDK 用的就是这条**，实测通过 |
+
+要点：**官方 MDK 写的是 `ForgeGradle:3.+`，不是很多人以为的 2.3**；Gradle 4.10.3 跑不了 Java 9+，
+必须用 Java 8 守护进程；`minecraft { }` 块用 `runs { client {...} }` 而不是 FG2.3 的 `runDir`。
+
+**1.12.2 的 jar 里没有 `pack.mcmeta`**，所以 `version-facts.mjs` 取不到 pack_format——
+这个值来自官方 MDK 的 `mdk/src/main/resources/pack.mcmeta`（= 3）。工具在这种情况下如实报错而不是猜。
 
 1.19.4 的实测差异（由编译器抓出，逐条已核对）：
 
