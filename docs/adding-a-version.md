@@ -115,6 +115,17 @@ cp packages/adapters/data/<loader>-<oldVersion>.json packages/adapters/data/<loa
 结论：1.16.5 需要**整套模板重写**（主类、两个注册类、物品组 API、包名、日志），
 而不是像 1.19.4 那样改 4 处。做法同样是**先 javap 取证再写**。
 
+### 1.16.5 取证的下一步（已确认的部分）
+
+- **Fabric API 模块名与版本格式都不一样**：1.16 时代是 `fabric-item-groups-v0`
+  （不是 `fabric-item-group-api-v1`），且版本号是**哈希形式**（`0.3.39+9244241690`），
+  **不带 MC 版本后缀**。因此不能靠版本号筛选，要读聚合器 `fabric-api-0.42.0+1.16.pom`
+  的 `<dependencyManagement>` 拿到该 MC 版本对应的确切模块版本。
+  同理，`version-facts.mjs` 目前按 `+<mc>` 后缀匹配 Fabric API 版本的做法，
+  对 1.16 及更早需要补一条「读聚合器 POM」的回退路径。
+- 其余待取证：1.16.5 的注册表类全名、日志方案（`org.slf4j` 不在类路径上，
+  该用 MC 自带的 log4j）、`AbstractBlock.Properties.of(Material)`、`ItemGroup` 自定义标签页。
+
 1.19.4 / 1.16.5 的实测差异（由编译器抓出，逐条已核对）：
 
 - **`Registries.CREATIVE_MODE_TAB` 不存在**。查 Mojang 官方映射表取证：1.19.4 命中 **0** 次，1.20.4 命中 2 次
