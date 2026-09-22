@@ -14,3 +14,8 @@ out/
 # Local image-provider credentials, when kept in a file rather than the environment.
 .env
 .env.*
+
+# Scratch space for compile-verification runs (generated projects + downloaded probe jars).
+# These are dot-prefixed and transient; a stray `git add -A` should never pick them up.
+.scratch/
+.probe/

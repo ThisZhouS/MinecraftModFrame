@@ -40,9 +40,11 @@ MCMOD/
 |   |   |       |-- gradlew.bat
 |   |   |       `-- PROVENANCE.md
 |   |   |-- data
+|   |   |   |-- fabric-1.19.4.json
 |   |   |   |-- fabric-1.20.4.json
 |   |   |   |-- fabric-1.21.1.json
 |   |   |   |-- fabric-1.21.4.json
+|   |   |   |-- forge-1.19.4.json
 |   |   |   |-- forge-1.20.1.json
 |   |   |   |-- forge-1.20.4.json
 |   |   |   |-- forge-1.21.4.json
