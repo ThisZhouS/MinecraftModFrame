@@ -11,7 +11,7 @@
 | S2 基线 | 原则、需求、任务计划 | S1 | docs/requirements.md + 本文档 | ✅ |
 | S3 核心切片 | core 管线 + 三面接口 + 单元/管线测试 | S2 | `pnpm -r build && pnpm -r test` | ✅ |
 | S4 真实适配器 | Fabric 1.21.1（编译级验证） | S3 | `mcmod gen` + `gradlew build` | ✅ |
-| S4b 真实适配器 | NeoForge 1.21.1：适配器数据与生成已完成；真编译因网络阻塞未完成 | S4 | 同上 | ⛔ 生成 ✅ / 编译验证阻塞 |
+| S4b 真实适配器 | NeoForge 1.21.1（后扩到 1.20.4 / 1.21.4）：适配器数据与生成；真编译 + 真运行（S18） | S4 | `mcmod gen` + `gradle build` + `verify-runtime.mjs` | ✅ 编译 + 运行验证通过（见 S18） |
 | S4c 真实适配器 | Forge 1.20.1（Java 17 + Gradle 8.8 + ForgeGradle 6）：适配器、wrapper 8.8 资产、真编译 | S4b | `mcmod gen` + `gradle build` | ✅ 编译验证通过 |
 | S5 端到端验收 | 三面冒烟 + 生成工程真编译 + Tree + 报告 | S4 | docs/acceptance-report.md | 🔄 |
 | S6 后续增强 | 配方/UI/模型生成、升级迁移工作流、适配器社区共建 | S5 | 后续方向 | ⬜ |
@@ -184,3 +184,24 @@ java.lang.NullPointerException: Registry Object not present: mk2:mk2
   FG6 在该版本挂掉，FG2.3 因 Forge 不再发布 `-userdev.jar` 而无法使用。
 - 验收：生成工程 **BUILD SUCCESSFUL** 并产出 jar；全套 113 项测试通过；
   fabric-1.16.5 / forge-1.16.5 复验仍通过（引擎改动无回归）。
+
+## S18 交付物（NeoForge 三目标编译 + 运行验证，已完成）
+
+**动机**：三个 NeoForge 目标长期挂着「已生成，未编译验证」——本机无法访问官方 maven，且事后证明
+**编译级验证也不够**：两处缺陷（mods.toml 文件名、loaderVersion 范围）只有真实运行才暴露
+（服务器正常启动、mod 从未加载）。本轮把「阻塞」拆成四个可解的子问题逐一消除。
+
+- **环境阻塞解除**（全部写入适配器 `notes` 与 acceptance-report §11.1/§16）：
+  - 插件解析只走 ForgeCDN 镜像（`neoforged.forgecdn.net/releases`），官方主机刻意不列入（Gradle 对不可达仓库硬失败）。
+  - `net.neoforged:minecraft-dependencies:<mc>` 镜像 404 ⇒ settings.gradle 从 Mojang 版本清单合成等价 POM 到本地仓库，按版本缓存。
+  - NFRT 钉版库被 Gradle 升级导致清单缺条目 ⇒ build.gradle `addArtifactsToManifest` 显式补 7 个坐标（`transitive=false`）。
+  - 1.20.4：MDG 1.x 硬编码 `--release 21` ⇒ 换 **MDG 2.0.147**；NFRT 要 Java 21 工具链 ⇒ Gradle 守护进程跑 JDK 21、JDK 17 靠注册表探测。
+- **运行级验收**：新增 `scripts/verify-runtime.mjs`——生成工程 → 起专用服务器 → 判据为 mod 初始化行 + `Done (`；
+  判出 WARN（服务器启动但 mod 未加载）/ FAIL（加载期崩溃）/ SKIPPED（缺工具链）/ TIMEOUT，失败退出码 1。
+- **真运行抓出的三处模板缺陷**（编译看不见）：
+  - 1.20.4：FML 2.0.17 只扫 `META-INF/mods.toml`（`neoforge.mods.toml` 是 1.21+ 的名字）→ 路径改回 + 回归测试。
+  - 1.20.4：`loaderVersion = "[4,)"` 被拒（javafml 语言版本是 2.0，日志 `Missing language javafml ... found 2.0`）→ 改 `"[2,)"` + 回归测试。
+  - 1.21.4：1.21.2+ 物品/方块必须带 registry id（运行 NPE `Item id not set`）→ settings 模板补 `.setId(ResourceKey.create(...))` + 回归测试。
+- **真编译抓出的缺陷**：1.20.4 数据包目录应为复数 `loot_tables`/`tags/blocks`（单数是 1.21 改动）→ contentPaths 改复数。
+- 验收：**3/3 真编译通过 + 3/3 真运行 PASS**（1.20.4 77s / 1.21.1 205s / 1.21.4 43s）；全套 **119 项测试通过**；
+  README 目标表、acceptance-report（§1/§11.1/§12/§13/§16）、environment.md 已同步。

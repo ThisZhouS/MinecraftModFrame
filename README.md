@@ -56,9 +56,9 @@ MCP 工具**不执行任何 shell/构建命令**：构建由使用方自行决�
 | `forge-1.20.1` | 1.20.1 | Forge (47.4.10, ForgeGradle 6.0.54, Gradle 8.8) | 17 | ✅ **真编译通过**（产出经 reobfJar 的 jar） |
 | `forge-1.20.4` | 1.20.4 | Forge (49.2.9, ForgeGradle 6.0.54, Gradle 8.8) | 17 | ✅ **真编译通过**（产出 jar） |
 | `forge-1.21.4` | 1.21.4 | Forge (54.1.18, ForgeGradle 6.0.54, Gradle 8.8) | 21 | ✅ **真编译通过**（产出 jar） |
-| `neoforge-1.20.4` | 1.20.4 | NeoForge (ModDevGradle) | 17 | ⚠️ 已生成，**未编译验证**（见验收报告 §8.1） |
-| `neoforge-1.21.1` | 1.21.1 | NeoForge (21.1.250, ModDevGradle 2.0.147) | 21 | ⚠️ 已生成，**未编译验证**（本机网络无法访问 maven.neoforged.net） |
-| `neoforge-1.21.4` | 1.21.4 | NeoForge (ModDevGradle) | 21 | ⚠️ 已生成，**未编译验证**（见验收报告 §8.1） |
+| `neoforge-1.20.4` | 1.20.4 | NeoForge (20.4.251, ModDevGradle 2.0.147) | 17 | ✅ **真编译 + 真运行通过**（产出 jar；专用服务器带 mod 启动，见验收报告 §16） |
+| `neoforge-1.21.1` | 1.21.1 | NeoForge (21.1.250, ModDevGradle 2.0.147) | 21 | ✅ **真编译 + 真运行通过**（产出 jar；专用服务器带 mod 启动） |
+| `neoforge-1.21.4` | 1.21.4 | NeoForge (21.4.157, ModDevGradle 2.0.147) | 21 | ✅ **真编译 + 真运行通过**（产出 jar；专用服务器带 mod 启动） |
 
 **注意 `forge-1.16.5` 用的是 MCP 名**（`net.minecraft.item.Item`），其余目标用 Mojang 官方名——
 这不是笔误：ForgeGradle 在该版本产出的构件虽然叫 `..._mapped_official_1.16.5.jar`，内容却是 MCP 命名。
@@ -306,10 +306,10 @@ MCMODKIT_API_PORT=7431 node packages/api/dist/index.js   # 仅监听 loopback
 
 ## 状态与边界
 
-- 当前切片：物品 + 方块 + 配方 + 进度 + 实体 + UI(Screen) + datagen + **贴图生成**；**Fabric 1.21.1 与 Forge 1.20.1 均已通过真实编译验证**（NeoForge 1.21.1 因本机无法访问 maven.neoforged.net 而未编译验证）。
-- 一键复验：`node scripts/verify-build.mjs --adapter forge-1.20.1 --gradle "8=<gradle-8.8>/bin/gradle.bat" --java-home-17 <jdk17>`（详情见 `docs/acceptance-report.md` §8）。
+- 当前切片：物品 + 方块 + 配方 + 进度 + 实体 + UI(Screen) + datagen + **贴图生成**；**全部 14 个目标（Fabric 5 / Forge 6 / NeoForge 3）均已通过真实编译验证**；NeoForge 三个目标与 Forge 1.20.1 还通过了**真实运行验证**（专用服务器实际加载 mod，`scripts/verify-runtime.mjs`，见验收报告 §16）。
+- 一键复验：编译 `node scripts/verify-build.mjs --adapter forge-1.20.1 --gradle "8=<gradle-8.8>/bin/gradle.bat" --java-home-17 <jdk17>`；运行 `node scripts/verify-runtime.mjs --adapter neoforge-1.21.1 --gradle "9=<gradle-9.5.1>/bin/gradle.bat" --java-home-21 <jdk21>`（详情见 `docs/acceptance-report.md` §12）。
 - 尚未实现：附魔/药水/盔甲/工具生成、跨版本升级工作流、自定义实体模型与 UV 贴图（当前实体贴图是 64×32 纯色占位）、真实图像模型接入（`paintTexture` 已是可替换的单一入口）。
-- 本机仅 JDK 21 ⇒ 只有 Java 21 目标可本机编译验证；其他版本目标会被明确标注为「仅生成、受限验证」，绝不谎称已验证。
+- 验证状态以目标行内标注为准（编译级/运行级分开）；无法在本机验证的目标会明确标注，绝不谎称已验证。
 
 ## 许可证
 

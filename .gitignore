@@ -21,3 +21,6 @@ out/
 .probe/
 # Per-version probe dirs (.probe116, .probe-1.12, ...) - same rules, named per target.
 .probe*/
+
+# Runtime-verification scratch (Forge 1.20.1 run logs + spec; harness output lives in Temp/).
+.rt/

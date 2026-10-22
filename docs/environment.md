@@ -84,3 +84,14 @@ Get-Command node,npm,pnpm,python,git,java,gradle,mvn,docker | Format-Table Sourc
 - Temurin `jdk-17.0.20.1+1`（`api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jdk/hotspot/normal/eclipse`）
 - Gradle `8.8`（Forge 线必需；ForgeGradle 6 拒绝 Gradle 9）与 Gradle `9.5.1`（Fabric 线；本轮重下受 github.com 阻塞，需保留副本）
 - 生成工程的构建缓存位于 `%USERPROFILE%\.gradle\caches\forge_gradle`（Forge 线首次构建约 385 MB）
+
+## 追加实测（2026-10-22，NeoForge 三目标编译 + 运行验证）
+
+| 目标 | 实测 | 影响 |
+| --- | --- | --- |
+| `neoforged.forgecdn.net/releases`（ForgeCDN） | ✅ 可达 | NeoForge 插件与工件可经镜像解析 ⇒ settings.gradle 只用它，官方主机不列入 |
+| `piston-meta.mojang.com`（Mojang 版本清单） | ✅ 可达 | 合成 `net.neoforged:minecraft-dependencies:<mc>` POM 的数据源（官方 maven 独有模块的替代） |
+| `maven.neoforged.net` | ❌ 仍被阻断 | 构建对它的最后两处依赖（minecraft-dependencies 模块、NFRT 钉版库回退下载）已分别由合成 POM 与 `addArtifactsToManifest` 消除 |
+| 本机 JDK | JDK 21.0.11 + JDK 17.0.13（`C:\Program Files\Microsoft\`） | Gradle 只通过**注册表**自动探测到 JDK 17；JDK 21 仅作为 **current JVM** 可探测 ⇒ 1.20.4 构建必须让 Gradle 守护进程跑在 JDK 21 上（NFRT 要 21 工具链），否则报 `Cannot find a Java installation ... languageVersion=21` |
+
+工具链使用（临时，位于 `Temp/tools`，不入库）：Gradle 9.5.1 本地发行版（三个 NeoForge 目标共用）。验收产物日志：`Temp/verify-build/<adapter>/build.log` 与 `Temp/verify-runtime/<adapter>/runtime.log`。

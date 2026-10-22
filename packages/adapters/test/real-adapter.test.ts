@@ -117,6 +117,74 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
     }
   });
 
+  it("points NeoForge projects at the reachable CDN and synthesizes the missing dependency module", () => {
+    // maven.neoforged.net is unreachable on some networks and Gradle fails hard on an unreachable
+    // repository instead of falling through. NeoForged's CDN mirrors it except for the synthetic
+    // net.neoforged:minecraft-dependencies module, which settings.gradle rebuilds from Mojang's
+    // version manifest; without it the NeoForm runtime falls back to downloading every Minecraft
+    // library from the official host. Both halves are load-bearing.
+    for (const a of listAdapters().filter((x) => x.loader === "neoforge")) {
+      expect(a.templates.settingsGradle, a.id).toContain("https://neoforged.forgecdn.net/releases");
+      expect(a.templates.settingsGradle, a.id).not.toContain("url = 'https://maven.neoforged.net");
+      expect(a.templates.settingsGradle, a.id).toContain("minecraft-dependencies");
+      expect(a.templates.settingsGradle, a.id).toContain("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
+    }
+  });
+
+  it("pins NFRT's userdev library versions on 1.20.4", () => {
+    // NFRT 2.x recompiles Minecraft from NeoForge's userdev config, which pins exact library
+    // versions (guava 31.1-jre, commons-io 2.11.0, ...). Gradle conflict resolution upgrades
+    // several of them, so the exact versions never reach ModDevGradle's artifact manifest and NFRT
+    // falls back to downloading them from maven.neoforged.net - unreachable on some networks.
+    const a = new Map(listAdapters().map((x) => [x.id, x])).get("neoforge-1.20.4")!;
+    expect(a.gradle.mdgVersion).toMatch(/^2\./);
+    expect(a.templates.buildGradle).toContain("addArtifactsToManifest");
+    expect(a.templates.buildGradle).toContain("commons-io:commons-io:2.11.0");
+    expect(a.templates.buildGradle).toContain("net.neoforged:mergetool:2.0.0:api");
+  });
+
+  it("sets registry ids in the 1.21.4 item and block properties", () => {
+    // 1.21.2+ validates that every Item/Block knows its registry id at construction. Without setId
+    // the dedicated server dies with "Item id not set" / "Block id not set"; the compiler accepts
+    // it, so pin the templates here.
+    const a = new Map(listAdapters().map((x) => [x.id, x])).get("neoforge-1.21.4")!;
+    expect(a.templates.itemSettings).toContain("setId(ResourceKey.create(Registries.ITEM");
+    expect(a.templates.itemSettingsMaxCount).toContain("setId(ResourceKey.create(Registries.ITEM");
+    expect(a.templates.blockSettings).toContain("setId(ResourceKey.create(Registries.BLOCK");
+    expect(a.templates.blockSettingsNoTool).toContain("setId(ResourceKey.create(Registries.BLOCK");
+    expect(a.templates.blocksRegistryClass).toContain("import net.minecraft.core.registries.Registries;");
+    expect(a.templates.blocksRegistryClass).toContain("import net.minecraft.resources.ResourceKey;");
+  });
+
+  it("uses the pre-1.21 plural datapack directories on 1.20.4", () => {
+    // The singular flattening landed in 1.21. A 1.20.4 mod shipping loot_table/ loads silently
+    // nothing - no compile error, no crash.
+    const a = new Map(listAdapters().map((x) => [x.id, x])).get("neoforge-1.20.4")!;
+    expect(a.contentPaths.lootTable).toContain("/loot_tables/blocks/");
+    expect(a.contentPaths.mineableTag).toContain("/tags/blocks/mineable/");
+  });
+
+  it("names the mod metadata file per FML generation", () => {
+    // FML 2.x (NeoForge 1.20.4) only scans META-INF/mods.toml; the neoforge.mods.toml rename
+    // landed with NeoForge 20.5/1.21. Getting this wrong is silent: the server boots happily and
+    // never loads the mod - verified at runtime, so pin it here.
+    const byId = new Map(listAdapters().map((x) => [x.id, x]));
+    const metadataPath = (id: string) => byId.get(id)!.projectFiles.find((f) => f.template === "modsToml")!.path;
+    expect(metadataPath("neoforge-1.20.4")).toContain("META-INF/mods.toml");
+    expect(metadataPath("neoforge-1.21.1")).toContain("META-INF/neoforge.mods.toml");
+    expect(metadataPath("neoforge-1.21.4")).toContain("META-INF/neoforge.mods.toml");
+  });
+
+  it("declares the FML 2.x javafml language version on 1.20.4", () => {
+    // FML 2.0.17 (NeoForge 1.20.4) provides javafml language version 2.0; "[4,)" is rejected at
+    // load time with "Missing language javafml version [4,) wanted by main, found 2.0" - the mod
+    // is discovered but silently never loaded. Verified at runtime, so pin it here.
+    const byId = new Map(listAdapters().map((x) => [x.id, x]));
+    expect(byId.get("neoforge-1.20.4")!.gradle.fmlLoaderVersionRange).toBe("[2,)");
+    expect(byId.get("neoforge-1.20.4")!.templates.modsToml).toContain('loaderVersion = "[2,)"');
+    expect(byId.get("neoforge-1.21.1")!.templates.modsToml).toContain('loaderVersion = "[4,)"');
+  });
+
   it("keeps the renderBackground signature version-correct in screen templates", () => {
     // Verified with javap against the real mapped jars: 1.20.1 takes (GuiGraphics), 1.21.x takes
     // (GuiGraphics, int, int, float). Getting this wrong is a compile error, so pin it here too.

@@ -10,7 +10,8 @@
 | L1 静态 | 5 个包 `tsc`（build 内置） | ✅ 通过 |
 | L2 单元/组件 | core / adapters / cli / mcp-server / api 的 vitest 用例 | ✅ **65 passed**（见 §2） |
 | L3 集成（三面） | CLI 端到端生成、MCP stdio JSON-RPC 全链路、HTTP API 端点 | ✅ 通过（见 §3） |
-| L4 真编译（内容） | 物品/方块/资源/数据包生成结果在目标 JDK + Gradle 下 `build` | ✅ Fabric 1.21.1、✅ Forge 1.20.1；⛔ NeoForge（见 §11.1） |
+| L4 真编译（内容） | 物品/方块/资源/数据包生成结果在目标 JDK + Gradle 下 `build` | ✅ **14/14 目标**（Fabric 5 / Forge 6 / NeoForge 3；见 §4、§5、§14、§15、§16） |
+| L4 真运行（加载） | `scripts/verify-runtime.mjs`：专用服务器带 mod 启动，日志须出现 mod 初始化行 + `Done (` | ✅ Forge 1.20.1；✅ NeoForge 1.20.4 / 1.21.1 / 1.21.4（见 §16） |
 | L4 真编译（UI） | Screen + 按键绑定 + 客户端引导生成结果 `build` | ✅ Fabric 1.21.1（1m58s）、✅ Forge 1.20.1（30s）（见 §6） |
 | L4 真编译（配方/进度） | 数据包 JSON 生成结果 `build` 且文件进 jar | ✅ 两版（见 §7） |
 | L4 真编译（实体） | 实体类 + 渲染器 + 注册类 + 掉落表 `build` 且进 jar | ✅ 两版（见 §8） |
@@ -223,7 +224,16 @@ Spec 里一段声明：
 
 ## 11. 阻塞 / 跳过 / 不适用
 
-### 11.1 NeoForge 1.21.1 真编译 —— ⛔ 阻塞（环境）
+### 11.1 NeoForge 真编译 / 真运行 —— ✅ 已解除阻塞（2026-10-22）
+
+原结论（「本机无法完成 NeoForge 编译验证」）已被推翻：三个 NeoForge 目标全部通过真编译 + 真运行，证据见 §16。环境阻塞靠四处工作绕开，**没有任何一步绕过验证**：
+
+1. **插件解析**：`maven.neoforged.net` 仍不可达；settings.gradle 只用 ForgeCDN 镜像（`neoforged.forgecdn.net/releases`），官方主机刻意不列入（Gradle 对不可达仓库**硬失败**，不回落）。
+2. **`net.neoforged:minecraft-dependencies:<mc>` 模块**：镜像 404、仅官方提供 ⇒ settings.gradle 从 Mojang 版本清单（`piston-meta.mojang.com`，可达）按当前 OS 合成等价 POM 到本地仓库 `.gradle/mcdeps-repo`，按版本缓存。
+3. **NFRT 钉版库**：NFRT 用 NeoForge userdev 配置重编译 Minecraft，配置钉死精确库版本（如 guava 31.1-jre）；Gradle 冲突解析会升级它们，导致清单缺条目、NFRT 回头找官方 maven ⇒ build.gradle 用 `addArtifactsToManifest` 把 7 个钉版坐标显式加进清单（`transitive=false`）。
+4. **1.20.4 的工具链**：MDG 1.x/NFRT 1.x 硬编码 `--release 21`（class 65 与 Java 17 工具链冲突）⇒ 换 MDG 2.0.147（官方支持 1.20.4 起）；NFRT 的 `createMinecraftArtifacts` 要求 Java 21 工具链 ⇒ Gradle 守护进程跑在 JDK 21 上（current-JVM 探测覆盖 21 工具链），JDK 17 由注册表自动探测。
+
+原表（4 次失败尝试）保留如下，作为「Gradle 对不可达仓库硬失败」这一约束的证据：
 
 | 尝试 | 配置 | 结果 | 说明 |
 | --- | --- | --- | --- |
@@ -234,7 +244,7 @@ Spec 里一段声明：
 
 **离线静态校验（最大努力）**：NeoForge 适配器模板引用的 13 个 `net.minecraft.*` 类逐个 `javap`（1.21.1 真实映射 jar）→ **13/13 存在**；8 个 `net.neoforged.*` 类**无法离线校验**（类文件在 `neoforge-*-universal.jar` 与 FML 工件内，两者都托管在被阻断的 maven 上；本地 userdev jar 只有 config/patches/joined.lzma，joined 内是补丁后的原版 MC，不含 NeoForge 代码）。
 
-结论：**本机无法完成 NeoForge 编译验证**。`neoforge-1.21.1` 一律标注「已生成，未编译验证」。对照经验：Forge 线同样的模板结构被编译器抓出 3 处 API 错误（§5、§6.4），静态检查无法替代编译。
+静态检查无法替代编译的对照经验依然成立：Forge 线同样的模板结构被编译器抓出 3 处 API 错误（§5、§6.4），而 NeoForge 线真实构建又抓出 §16.2 的 6 处缺陷——其中「mods.toml 文件名」与「loaderVersion [4,)」两处是**编译器根本看不见、只有真实运行才暴露**的。
 
 ### 11.2 其他阻塞 / 跳过
 
@@ -249,19 +259,33 @@ Spec 里一段声明：
 ## 12. 一键复验 / Re-verification
 
 ```bash
-pnpm -r build && pnpm -r test            # 50 passed
+pnpm -r build && pnpm -r test            # 119 passed (2026-10-22)
 node scripts/verify-build.mjs --adapter fabric-1.21.1 \
   --gradle "9=C:/tools/gradle-9.5.1/bin/gradle.bat" --java-home-21 <jdk21>
 node scripts/verify-build.mjs --adapter forge-1.20.1 \
   --gradle "8=C:/tools/gradle-8.8/bin/gradle.bat" --java-home-17 <jdk17>
 ```
 
-脚本按**适配器声明的 `gradleWrapperVersion`** 选择 Gradle 线，缺工具链时如实报 `SKIPPED`；失败退出码 1，并在 `Temp/verify-build/<adapter>/build.log` 留完整日志。
+运行级复验（`verify-runtime.mjs`：生成工程 → 起专用服务器 → 看 mod 初始化行 + `Done (`）：
+
+```bash
+node scripts/verify-runtime.mjs --adapter neoforge-1.21.1 --gradle "9=<gradle-9.5.1>/bin/gradle.bat" \
+  --java-home-21 <jdk21> --timeout 900
+node scripts/verify-runtime.mjs --adapter neoforge-1.21.4 --gradle "9=<gradle-9.5.1>/bin/gradle.bat" \
+  --java-home-21 <jdk21> --timeout 900
+# 1.20.4 注意：--java-home-17 这里传的是 JDK 21 路径——harness 把它用作 Gradle 守护进程的 JAVA_HOME。
+# NFRT 的 createMinecraftArtifacts 要 Java 21 工具链，而本机只有 current-JVM 探测能覆盖它；
+# JDK 17（编译 mod 用）由注册表自动探测。见 §11.1 第 4 条。
+node scripts/verify-runtime.mjs --adapter neoforge-1.20.4 --gradle "9=<gradle-9.5.1>/bin/gradle.bat" \
+  --java-home-17 <jdk21> --timeout 900
+```
+
+脚本按**适配器声明的 `gradleWrapperVersion`** 选择 Gradle 线，缺工具链时如实报 `SKIPPED`；失败退出码 1，并在 `Temp/verify-build/<adapter>/build.log` 与 `Temp/verify-runtime/<adapter>/runtime.log` 留完整日志。已知限制：`--gradle-arg` 经 shell 拼接不经转义，含空格的参数（如 `-Dorg.gradle.java.installations.paths`）会被拆坏，勿用。
 
 ## 13. 遗留风险与缺口
 
-1. **NeoForge 未编译验证**：见 §11.1；在能访问 `maven.neoforged.net` 的机器上跑 `verify-build.mjs --adapter neoforge-1.21.1` 即可补齐。
-2. **UI 只到「可编译」**：没有运行时验证（无法在无图形环境启动客户端），也没有贴图/字体/交互逻辑（输入框、列表、滚动）。
+1. **NeoForge 验证依赖合成 POM 与钉版清单钩子**（§11.1/§16）：两者都建立在「Mojang 版本清单结构」与「NeoForge userdev 钉版库列表」的现状之上，上游改动时可能再次失效；全部细节已写入适配器 `notes`，失效时按 §12 复验即可定位。
+2. **UI 只到「可编译」**：没有运行时验证（无法在无图形环境启动客户端），也没有贴图/字体/交互逻辑（输入框、列表、滚动）。NeoForge/Forge 的运行验证止于专用服务器启动 + mod 初始化日志；客户端路径（屏幕渲染、按键绑定）仍未验证。
 3. **版本漂移**：适配器钉住的版本号会随上游变旧，需要版本巡检工作流（数据源见 docs/research/2026-09-version-api-knowledge.md §2.4）。
 4. **贴图缺失**：物品/方块贴图需自备（生成工程 README 已明确）。
 5. **覆盖子集仍有限**：配方、进度、实体、附魔、datagen 尚未实现。
@@ -368,3 +392,38 @@ Fabric 从 1.14 开始。**该目标只有 Forge，这是上游事实不是框�
 3. **采集等级固定为 1**：ModSpec 只建模「用什么工具」，不建模「什么等级」，1.12.2 需要等级参数，
    适配器取了该年代普通方块的默认值 1。已在 `notes` 里写明。
 4. **Fabric 侧无对应目标**，非本框架所能补。
+
+## 16. L4 真编译 + 真运行（六）：NeoForge 1.20.4 / 1.21.1 / 1.21.4（本轮新增）
+
+### 16.1 命令与结果
+
+三个目标用同一份冒烟 Spec（物品 + 方块 + 钓鱼竿行为 + 原版创造组 + 自定义标签页 + 程序化贴图）生成工程，`gradle build` 通过后，由 `scripts/verify-runtime.mjs` 起**专用服务器**，判据是日志出现 mod 自己的初始化行 **且** `Done (`：
+
+| 目标 | 构建 | 运行（verify-runtime.mjs） | 证据（runtime.log） |
+| --- | --- | --- | --- |
+| `neoforge-1.20.4` | ✅ BUILD SUCCESSFUL（jar 进 build/libs） | ✅ PASS（77s） | `rtcheckneoforge initialized for Minecraft 1.20.4` + `Done (17.777s)` |
+| `neoforge-1.21.1` | ✅ BUILD SUCCESSFUL | ✅ PASS（205s） | `rtcheckneoforge initialized for Minecraft 1.21.1` + `Done (` |
+| `neoforge-1.21.4` | ✅ BUILD SUCCESSFUL | ✅ PASS（43s） | `rtcheckneoforge initialized for Minecraft 1.21.4` + `Done (7.429s)` |
+
+### 16.2 由真编译 / 真运行发现并修复的缺陷
+
+| 缺陷 | 发现方式 | 处理 |
+| --- | --- | --- |
+| MDG 1.x / NFRT 1.x 硬编码 `--release 21`，Java 17 工具链报 class 65（`Bad class file`） | 1.20.4 构建失败 | 三个适配器统一换 **MDG 2.0.147**（官方支持 1.20.4 起） |
+| NFRT 钉版库（guava 31.1-jre 等）被 Gradle 冲突解析升级后从工件清单消失，NFRT 回头访问被阻断的官方 maven | 1.20.4 构建失败 | build.gradle 追加 `addArtifactsToManifest` 钩子：7 个钉版坐标、`transitive=false` |
+| 1.20.4 的 FML 2.0.17 只扫描 `META-INF/mods.toml`（`neoforge.mods.toml` 是 1.21+ 的名字） | 运行 WARN：服务器启动、mod **从未加载** | 1.20.4 的 mods.toml 路径改回 `META-INF/mods.toml` + 回归测试 |
+| 1.20.4 的 mods.toml 声明 `loaderVersion = "[4,)"`，但 FML 2.0.17 的 javafml 语言版本是 **2.0** | 运行 WARN：`Missing language javafml version [4,) wanted by main, found 2.0` | 1.20.4 的 `fmlLoaderVersionRange` 与模板改 `"[2,)"` + 回归测试 |
+| MC 1.21.2+ 注册物品/方块必须带 registry id | 1.21.4 运行 FAIL：`Item id not set` / `Block id not set` | 1.21.4 的 item/block settings 模板补 `.setId(ResourceKey.create(...))` + imports |
+| 1.20.4 数据包目录是复数 `loot_tables` / `tags/blocks`（单数是 1.21 改动） | 与 1.21.x 对照 + 真实 jar 取证 | 1.20.4 的 `contentPaths` 改复数 |
+
+前两条被**编译器**抓住；「mods.toml 文件名」与「loaderVersion [4,)」两条是编译器根本看不见、**只有真实运行才暴露**的——服务器开开心心启动完，mod 从未被加载。这正是把验收从「编译级」推进到「运行级」的动机（§1 L4 真运行行）。
+
+### 16.3 环境阻塞的解除方式
+
+见 §11.1。核心是承认「官方 maven 不可达」为环境常量，然后逐项消除构建对它的依赖：插件走 ForgeCDN 镜像、`minecraft-dependencies` 模块本地合成、钉版库显式进清单。全部改动在真实构建中执行并留下日志（`Temp/verify-build/`、`Temp/verify-runtime/`）。
+
+### 16.4 没做到的部分（如实标注）
+
+1. **运行验证止于专用服务器**：mod 在服务器上完成构造、注册并进入世界；客户端路径（屏幕渲染、按键绑定、创造模式标签页展示）未验证。
+2. **1.20.4 的验证依赖「JDK 21 守护进程 + 注册表探测 JDK 17」**：本机 Gradle 的 current-JVM 探测覆盖 21 工具链、17 靠注册表；换机器若探测不到 17，需配置 `org.gradle.java.installations.paths`（本机实测该参数经 harness 的 `--gradle-arg` 传递会被 shell 转义破坏，故未采用，见 §12 已知限制）。
+3. 三个目标仍只覆盖 items + blocks + textures 切片（UI/配方/进度/实体/datagen 未移植到 NeoForge，同 §15.5）。
