@@ -42,6 +42,25 @@ function checkerboardWithSubject(): Buffer {
   });
 }
 
+/** A PNG with only a signature + IHDR + IEND — enough for decodePng to see the claimed size. */
+function makeHeaderOnlyPng(width: number, height: number): Buffer {
+  const chunk = (type: string, data: Uint8Array): Buffer => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length, 0);
+    return Buffer.concat([len, Buffer.from(type, "ascii"), data, Buffer.alloc(4)]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", ihdr),
+    chunk("IEND", new Uint8Array(0)),
+  ]);
+}
+
 function alphaAt(img: RgbaImage, x: number, y: number): number {
   return img.data[(y * img.width + x) * 4 + 3]!;
 }
@@ -65,6 +84,11 @@ describe("png decoding", () => {
     const bad = makeRgbPng(2, 2, () => [0, 0, 0]);
     bad[24] = 16; // bit depth 16
     expect(() => decodePng(bad)).toThrow(/bit depth 16/);
+  });
+
+  it("rejects a decompression-bomb IHDR before allocating the pixel buffer", () => {
+    expect(() => decodePng(makeHeaderOnlyPng(5000, 5000))).toThrow(/per-side limit/);
+    expect(() => decodePng(makeHeaderOnlyPng(0, 4))).toThrow(/bad dimensions/);
   });
 });
 

@@ -707,7 +707,7 @@ function genEntities(ctx: GenContext, javaDir: string): EntityGenOut {
       id: entity.id,
       ENTITY_ID: entity.id,
       ENTITY_CLASS: cls,
-      ENTITY_FQ: `${a.basePackagePattern.replace("{{modId}}", ctx.spec.mod.modId)}.${a.entitySubpackage}.${cls}`,
+      ENTITY_FQ: `${ctx.vars.entityPackageName}.${cls}`,
       ENTITY_CONST: constName,
       ENTITY_BASE_CLASS: kind.baseClass,
       ENTITY_ATTRIBUTE_BASE: kind.attributeBase,
@@ -841,6 +841,9 @@ function genTextures(ctx: GenContext): TextureGenOut {
 
   for (const item of ctx.spec.content.items) {
     const generated = ctx.images?.get(`item:${item.id}`);
+    if (generated === undefined && ctx.spec.textureProvider !== "procedural" && (item.texture?.prompt !== undefined || item.texture?.file !== undefined)) {
+      ctx.warnings.push(`item "${item.id}": declares a texture source but no prepared image; painted procedurally`);
+    }
     push(
       paths.itemTexture,
       item.id,
@@ -858,6 +861,9 @@ function genTextures(ctx: GenContext): TextureGenOut {
   }
   for (const block of ctx.spec.content.blocks) {
     const generated = ctx.images?.get(`block:${block.id}`);
+    if (generated === undefined && ctx.spec.textureProvider !== "procedural" && (block.texture?.prompt !== undefined || block.texture?.file !== undefined)) {
+      ctx.warnings.push(`block "${block.id}": declares a texture source but no prepared image; painted procedurally`);
+    }
     push(
       paths.blockTexture,
       block.id,
@@ -882,6 +888,9 @@ function genTextures(ctx: GenContext): TextureGenOut {
     }
     for (const entity of ctx.spec.content.entities) {
       const generated = ctx.images?.get(`entity:${entity.id}`);
+      if (generated === undefined && ctx.spec.textureProvider !== "procedural" && (entity.texture?.prompt !== undefined || entity.texture?.file !== undefined)) {
+        ctx.warnings.push(`entity "${entity.id}": declares a texture source but no prepared image; painted procedurally`);
+      }
       push(
         paths.entityTexture,
         entity.id,
@@ -916,6 +925,15 @@ export interface PlanOptions {
 export function planGeneration(spec: ModSpecT, adapter: AdapterRecordT, options: PlanOptions = {}): GenerationPlan {
   const ctx = makeContext(spec, adapter, options.images);
   const files: FileEntry[] = [];
+
+  // image-api / file specs degrade silently when the caller did not prepare textures: the
+  // generator paints procedurally and the agent believes it got model art or its own files.
+  // Warn instead.
+  if (spec.textures && spec.textureProvider !== "procedural" && options.images === undefined) {
+    ctx.warnings.push(
+      `textureProvider is "${spec.textureProvider}" but no textures were prepared; falling back to procedural painting`,
+    );
+  }
 
   // Duplicate content ids would collide in registries, models and lang — reject early.
   const seenIds = new Map<string, string>();

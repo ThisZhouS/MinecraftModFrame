@@ -29,10 +29,17 @@ export const TextureSpec = z.object({
   /** Override the derived RNG seed to get a different pattern for the same id. */
   seed: z.number().int().min(0).max(4294967295).optional(),
   /**
-   * Prompt for an image-model provider (spec.textureProvider != "procedural"). Ignored by the
+   * Prompt for an image-model provider (spec.textureProvider == "image-api"). Ignored by the
    * procedural painter, which is driven by style/palette/seed instead.
    */
   prompt: z.string().min(1).optional(),
+  /**
+   * Path to a local PNG used as the texture source (spec.textureProvider == "file"). The file is
+   * read at generation time, decoded and reduced to a Minecraft texture (alpha-keyed like the
+   * image-api path). Relative paths resolve against the spec file's directory in the CLI; the MCP
+   * and HTTP surfaces require absolute paths.
+   */
+  file: z.string().min(1).optional(),
   /**
    * Output texture size in pixels. 16 is the vanilla item standard; larger sizes keep more of the
    * detail an image model produces (a 1920px render averaged down to 16px loses thin features such
@@ -279,13 +286,15 @@ export const ModSpec = z.object({
   textures: z.boolean().default(false),
   /**
    * Where texture pixels come from. "procedural" (default) paints locally and deterministically;
-   * "image-api" calls a configured image model for any content that declares a `texture.prompt`,
-   * falling back to the procedural painter for everything else.
+   * "image-api" calls a configured image model for any content that declares a `texture.prompt`;
+   * "file" reads a local PNG for any content that declares a `texture.file` - the same decode /
+   * keying / downscale pipeline either way. Content without a prompt/file falls back to the
+   * procedural painter.
    *
-   * The endpoint, model and credential come from the environment (MCMODKIT_IMAGE_*), never from the
-   * spec — a spec is a shareable artefact and must not carry a secret.
+   * The image endpoint, model and credential come from the environment (MCMODKIT_IMAGE_*), never
+   * from the spec — a spec is a shareable artefact and must not carry a secret.
    */
-  textureProvider: z.enum(["procedural", "image-api"]).default("procedural"),
+  textureProvider: z.enum(["procedural", "image-api", "file"]).default("procedural"),
 }).strict();
 
 export type ScreenSpecT = z.infer<typeof ScreenSpec>;

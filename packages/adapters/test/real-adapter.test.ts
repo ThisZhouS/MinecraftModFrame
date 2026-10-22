@@ -179,10 +179,11 @@ describe("adapter data hygiene (principle 1: version facts only in adapters)", (
     // FML 2.0.17 (NeoForge 1.20.4) provides javafml language version 2.0; "[4,)" is rejected at
     // load time with "Missing language javafml version [4,) wanted by main, found 2.0" - the mod
     // is discovered but silently never loaded. Verified at runtime, so pin it here.
+    // The template must CONSUME the gradle fact: a hardcoded range is how the values drifted apart.
     const byId = new Map(listAdapters().map((x) => [x.id, x]));
     expect(byId.get("neoforge-1.20.4")!.gradle.fmlLoaderVersionRange).toBe("[2,)");
-    expect(byId.get("neoforge-1.20.4")!.templates.modsToml).toContain('loaderVersion = "[2,)"');
-    expect(byId.get("neoforge-1.21.1")!.templates.modsToml).toContain('loaderVersion = "[4,)"');
+    expect(byId.get("neoforge-1.20.4")!.templates.modsToml).toContain('loaderVersion = "{{gradle_fmlLoaderVersionRange}}"');
+    expect(byId.get("neoforge-1.21.1")!.templates.modsToml).toContain('loaderVersion = "{{gradle_fmlLoaderVersionRange}}"');
   });
 
   it("keeps the renderBackground signature version-correct in screen templates", () => {

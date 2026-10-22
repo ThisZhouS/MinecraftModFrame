@@ -6,9 +6,14 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { toAgentError } from "@mcmodkit/core";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { toolDefs } from "./tools.js";
 
-const VERSION = "0.1.0";
+/** Read from the package manifest so the version can never drift from what gets published. */
+const VERSION: string = JSON.parse(
+  readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"),
+).version;
 
 const INSTRUCTIONS =
   "mcmodkit scaffolds Minecraft mod projects for specific (mcVersion x loader) targets. " +

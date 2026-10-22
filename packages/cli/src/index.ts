@@ -13,16 +13,21 @@ import {
   emitPlan,
   McmodError,
   parseModSpec,
-  prefetchTextures,
+  prepareTextures,
 } from "@mcmodkit/core";
 import type { ModSpecT } from "@mcmodkit/core";
 import { adapterSummary, listAdapters, listTargets, planProject, requireAdapter } from "@mcmodkit/adapters";
-import { pathToFileURL } from "node:url";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { writeFile } from "node:fs/promises";
 import { loadSpecJson } from "./load-spec.js";
 import { failAndCode, logWarn, printOk } from "./output.js";
 
-const VERSION = "0.1.0";
+/** Read from the package manifest so the version can never drift from what gets published. */
+const VERSION: string = JSON.parse(
+  readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"),
+).version;
 
 const program = new Command();
 program
@@ -108,14 +113,15 @@ program
       throw new McmodError("SPEC_INVALID", "ModSpec validation failed:\n" + parsed.formatted, { issues: parsed.issues });
     }
     const adapter = requireAdapter(parsed.spec.target.mcVersion, parsed.spec.target.loader);
-    // Image-model textures are fetched before planning so the generator itself stays I/O-free.
-    // A dry run skips this: it must not spend money or need a network just to list files.
+    // Textures are prepared before planning so the generator itself stays I/O-free. A dry run skips
+    // this: it must not spend money or need a network just to list files. Relative texture.file
+    // paths resolve against the spec file's directory ("-" = the current directory).
     let images: Map<string, Uint8Array> | undefined;
-    if (opts.dryRun !== true && parsed.spec.textureProvider === "image-api") {
-      const prefetched = await prefetchTextures(parsed.spec, {
+    if (opts.dryRun !== true && parsed.spec.textures) {
+      images = await prepareTextures(parsed.spec, {
+        baseDir: spec === "-" ? process.cwd() : dirname(resolve(spec)),
         onProgress: (m) => process.stderr.write(m + "\n"),
       });
-      images = new Map([...prefetched].map(([k, v]) => [k, v.texture]));
     }
     const plan = planProject(parsed.spec, adapter, { images });
     for (const w of plan.warnings) logWarn(w);

@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { McmodError, emitPlan, exampleSpec, parseModSpec } from "@mcmodkit/core";
+import { McmodError, emitPlan, exampleSpec, parseModSpec, prepareTextures } from "@mcmodkit/core";
 import type { AdapterRecordT, ModSpecT } from "@mcmodkit/core";
 import { adapterSummary, getAdapter, listAdapters, listTargets, planProject, requireAdapter } from "@mcmodkit/adapters";
 
@@ -81,7 +81,9 @@ export const toolDefs: ToolDef[] = [
     description:
       "Generate a complete, buildable Gradle mod project for the spec's target. Writes files under <outDir>/<modId>/; " +
       "managed files are overwritten on re-run (idempotent iteration) while files outside the plan are never touched. " +
-      "Use dryRun=true to get the file plan without writing. Never runs shell commands or builds.",
+      "textureProvider \"image-api\" fetches textures from the configured provider (MCMODKIT_IMAGE_* env); " +
+      "textureProvider \"file\" reads the local PNGs named by each texture.file (absolute paths only). " +
+      "dryRun=true skips texture preparation and the writes. Never runs shell commands or builds.",
     inputSchema: z.object({
       spec: z.unknown().describe("ModSpec object (validate_spec it first)"),
       outDir: z.string().min(1).describe("absolute directory that will contain <modId>/"),
@@ -97,7 +99,15 @@ export const toolDefs: ToolDef[] = [
       }
       const spec: ModSpecT = parsed.spec;
       const adapter = requireAdapter(spec.target.mcVersion, spec.target.loader);
-      const plan = planProject(spec, adapter);
+      // Same texture behaviour as the CLI: dry runs stay offline, real runs prepare before planning.
+      // texture.file paths must be absolute here (the server cannot know the spec file's location).
+      let images: Map<string, Uint8Array> | undefined;
+      if (args.dryRun !== true && spec.textures) {
+        images = await prepareTextures(spec, {
+          onProgress: (m) => process.stderr.write(m + "\n"),
+        });
+      }
+      const plan = planProject(spec, adapter, { images });
       const result = await emitPlan(plan, { outDir: String(args.outDir), dryRun: args.dryRun === true });
       return {
         adapterId: adapter.id,

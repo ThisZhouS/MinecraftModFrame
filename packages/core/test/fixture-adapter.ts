@@ -29,7 +29,7 @@ export function makeFixtureAdapter(): AdapterRecordT {
     ],
     templates: {
       settingsGradle: "rootProject.name = '{{modId}}'\n",
-      gradleProps: "org.gradle.jvmargs=-Xmx1G\nmc_version={{mcVersion}}\n",
+      gradleProps: "org.gradle.jvmargs=-Xmx1G\nmc_version={{mcVersion}}\nloom={{gradle_loomVersion}}\n",
       wrapperProps: "distributionUrl=gradle-{{gradleWrapperVersion}}-bin.zip\n",
       mainClass: "package {{packageName}};\n// entrypoint {{mainClassFq}} for {{modId}}\n",
       itemsRegistryClass:

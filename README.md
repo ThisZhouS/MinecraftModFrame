@@ -130,6 +130,25 @@ node packages/cli/dist/index.js gen examples/mk2-fishing-rod-forge-1.20.1.json -
 - 网络步骤在 `planGeneration` **之外**：生成计划始终是同步、无 I/O 的纯函数，图像字节由调用方预取后传入——这样生成器可离线测试。
 - `size` 建议 32：实测 1920px 的图缩到 16px 会把钓线这类细特征平均掉，32px 能保住。
 
+## 外部图片（本地 PNG，可选）
+
+不想生图、只想用现成美术：把 `textureProvider` 设为 `file`，内容上写 `texture.file`（本地 PNG 路径）：
+
+```jsonc
+{
+  "textures": true,
+  "textureProvider": "file",
+  "content": {
+    "items":  [ { "id": "ruby", "texture": { "file": "art/ruby.png", "size": 16 } } ],
+    "blocks": [ { "id": "ruby_pillar", "texture": { "file": "C:/art/pillar.png" } } ]
+  }
+}
+```
+
+- CLI 里**相对路径**相对于 spec 文件所在目录解析（`-` 读 stdin 时相对于当前目录）；MCP `scaffold_mod` 与 HTTP `/api/generate` **只接受绝对路径**（服务端不知道 spec 文件在哪）。
+- 走同一条转换管线（解码 → 抠背景 → 裁主体 → 缩放），所以大图、白底、带水印的素材也能直接进。
+- 文件不是可用的 8-bit RGB/RGBA PNG、或超过 20 MiB 时，报 `SPEC_INVALID` 并指出具体文件；没有 `file` 的内容仍走本地绘制；`--dry-run` **不读文件**。
+
 ## 物品行为（可选）
 
 框架默认产出裸 `Item`。要真正有行为（比如钓鱼竿要能抛竿），用 `behavior` 选一个适配器提供的构造式：

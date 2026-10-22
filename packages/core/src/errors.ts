@@ -6,7 +6,9 @@ export type McmodErrorCode =
   | "TEMPLATE_ERROR"
   | "PATH_ESCAPE"
   | "PLAN_INVALID"
-  | "IO_ERROR";
+  | "IO_ERROR"
+  /** HTTP surface only: the request matched no route. */
+  | "ROUTE_NOT_FOUND";
 
 export class McmodError extends Error {
   constructor(

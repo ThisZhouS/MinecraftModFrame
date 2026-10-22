@@ -11,8 +11,6 @@
   "gradle": {
     "forgeGradleVersion": "3.+",
     "forgeVersion": "14.23.5.2864",
-    "loaderVersionRange": "[14.23.5,)",
-    "minecraftVersionRange": "[1.12.2,1.13)",
     "packFormat": 3,
     "mappingChannel": "snapshot",
     "mappingVersion": "20171003-1.12"

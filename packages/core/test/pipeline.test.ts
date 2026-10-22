@@ -169,6 +169,20 @@ describe("lintAdapter", () => {
     }
     expect(lintAdapter(a)).toEqual([]);
   });
+  // Regression: NeoForge declared gradle.fmlLoaderVersionRange but the modsToml template hardcoded
+  // the range instead of consuming it - the two drifted apart ([4,) vs the real FML 2.0). Any gradle
+  // fact that nothing consumes is dead data and drifts.
+  it("rejects a gradle fact no template or projectFile path consumes", () => {
+    const a = makeFixtureAdapter();
+    a.gradle = { ...a.gradle, forgeVersion: "47.4.10" };
+    expect(lintAdapter(a).join("\n")).toMatch(/gradle\.forgeVersion is never consumed/);
+  });
+  it("accepts a gradle fact consumed by a projectFile path", () => {
+    const a = makeFixtureAdapter();
+    a.gradle = { ...a.gradle, layoutRoot: "base" };
+    a.projectFiles.push({ path: "{{gradle_layoutRoot}}/extra.txt", template: "settingsGradle", managed: true, executable: false });
+    expect(lintAdapter(a)).toEqual([]);
+  });
 });
 
 describe("planGeneration", () => {
@@ -236,6 +250,51 @@ describe("planGeneration", () => {
       content: { items: [{ id: "ruby" }], blocks: [{ id: "ruby" }] },
     });
     expect(() => planGeneration(spec, makeFixtureAdapter())).toThrowError(McmodError);
+  });
+
+  // Regression: an image-api/file spec planned without prepared textures silently painted
+  // procedural textures. Every surface (CLI/MCP/HTTP) must hear about the downgrade instead.
+  it("warns when an image-api spec is planned without prepared images", () => {
+    const spec = parseSpecOrThrow({
+      schemaVersion: 1,
+      mod: { modId: "examplemod" },
+      target: { mcVersion: "1.21.1", loader: "fabric" },
+      textures: true,
+      textureProvider: "image-api",
+      content: { items: [{ id: "ruby", texture: { prompt: "a red gem" } }], blocks: [] },
+    });
+    const p = planGeneration(spec, makeFixtureAdapter());
+    expect(p.warnings.some((w) => w.includes('textureProvider is "image-api" but no textures were prepared'))).toBe(true);
+  });
+
+  it("warns when a file spec is planned without prepared images", () => {
+    const spec = parseSpecOrThrow({
+      schemaVersion: 1,
+      mod: { modId: "examplemod" },
+      target: { mcVersion: "1.21.1", loader: "fabric" },
+      textures: true,
+      textureProvider: "file",
+      content: { items: [{ id: "ruby", texture: { file: "art/ruby.png" } }], blocks: [] },
+    });
+    const p = planGeneration(spec, makeFixtureAdapter());
+    expect(p.warnings.some((w) => w.includes('textureProvider is "file" but no textures were prepared'))).toBe(true);
+  });
+
+  it("warns when a texture source is missing from the prepared set", () => {
+    const spec = parseSpecOrThrow({
+      schemaVersion: 1,
+      mod: { modId: "examplemod" },
+      target: { mcVersion: "1.21.1", loader: "fabric" },
+      textures: true,
+      textureProvider: "image-api",
+      content: {
+        items: [{ id: "ruby", texture: { prompt: "a red gem" } }, { id: "plain" }],
+        blocks: [],
+      },
+    });
+    const p = planGeneration(spec, makeFixtureAdapter(), { images: new Map() });
+    expect(p.warnings.some((w) => w.includes('item "ruby": declares a texture source but no prepared image'))).toBe(true);
+    expect(p.warnings.some((w) => w.includes('item "plain"'))).toBe(false);
   });
 });
 

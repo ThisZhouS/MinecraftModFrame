@@ -203,6 +203,18 @@ Spec 里一段声明：
 
 设计取舍：贴图走**参数化程序化绘制**而非调用图像模型——离线、瞬时、**可复现**。可复现是关键：改图会体现为 diff，而不是不可复现的噪声；接真实模型只需替换 `paintTexture` 一个函数。
 
+### 9b.0 外部图片输入（2026-10-22 新增）
+
+第三个贴图来源：`textureProvider: "file"` + `texture.file`（本地 PNG 路径）。与 image-api 共用同一条转换管线（decodePng → 抠背景 → 裁主体 → 缩放 → 编码），差异只在字节来源：
+
+| 项 | 证据 |
+| --- | --- |
+| 相对路径 | CLI 实测：`file: "source.png"` 相对 spec 文件目录解析，产出 `textures/item/ruby.png` 正常（`Temp/filetest` 端到端） |
+| 绝对路径约束 | 单测：无 baseDir（MCP/HTTP 场景）时相对路径报「must be an absolute path」 |
+| 错误路径 | 单测：文件缺失 / 非可用 PNG / 超 20 MiB 均报 `SPEC_INVALID` 并带具体文件路径 |
+| 降级可见 | 单测：file/image-api spec 未经 prepareTextures 直接进计划 → warning（不再静默画程序化贴图） |
+| 三面一致 | CLI / MCP / HTTP 统一走 `prepareTextures` 单一分发器（审计修复 #1 的延续），`--dry-run` 不读文件不联网 |
+
 ### 9b.1 模型形态（handheld / cube_column）
 
 | 项 | 证据 |
@@ -259,7 +271,7 @@ Spec 里一段声明：
 ## 12. 一键复验 / Re-verification
 
 ```bash
-pnpm -r build && pnpm -r test            # 119 passed (2026-10-22)
+pnpm -r build && pnpm -r test            # 146 passed (2026-10-22)
 node scripts/verify-build.mjs --adapter fabric-1.21.1 \
   --gradle "9=C:/tools/gradle-9.5.1/bin/gradle.bat" --java-home-21 <jdk21>
 node scripts/verify-build.mjs --adapter forge-1.20.1 \
@@ -427,3 +439,19 @@ Fabric 从 1.14 开始。**该目标只有 Forge，这是上游事实不是框�
 1. **运行验证止于专用服务器**：mod 在服务器上完成构造、注册并进入世界；客户端路径（屏幕渲染、按键绑定、创造模式标签页展示）未验证。
 2. **1.20.4 的验证依赖「JDK 21 守护进程 + 注册表探测 JDK 17」**：本机 Gradle 的 current-JVM 探测覆盖 21 工具链、17 靠注册表；换机器若探测不到 17，需配置 `org.gradle.java.installations.paths`（本机实测该参数经 harness 的 `--gradle-arg` 传递会被 shell 转义破坏，故未采用，见 §12 已知限制）。
 3. 三个目标仍只覆盖 items + blocks + textures 切片（UI/配方/进度/实体/datagen 未移植到 NeoForge，同 §15.5）。
+
+## 17. 全项目审核与修复（2026-10-22）
+
+对引擎、适配器数据、三个接入面、文档与脚本的全面审核，发现并修复 7 项：
+
+| 发现 | 修复 |
+| --- | --- |
+| MCP `scaffold_mod` 与 HTTP `/api/generate` 不预取 image-api 贴图，程序化贴图静默顶替，与 CLI 行为不一致 | 两面与 CLI 对齐（dryRun 仍离线）；`planGeneration` 对「image-api 但无预取图片 / 有 prompt 但缺图」推 warning，不再静默 |
+| `gradle.fmlLoaderVersionRange`（NeoForge×3）与 `loaderVersionRange`/`minecraftVersionRange`（forge-1.12.2）声明后无任何模板引用，正是「loaderVersion [4,) 漂移」一案的温床 | NeoForge 的 modsToml 改用 `{{gradle_fmlLoaderVersionRange}}`；1.12.2 删去死键；`lintAdapter` 新增规则：**gradle 键必须被模板或 projectFile 路径消费**（回归测试覆盖） |
+| `decodePng` 无尺寸上限，恶意 IHDR 可致巨量分配 | 4096px/边上限 + 非正尺寸拒绝（在 inflate 前拦截） |
+| image-provider 配置无校验：负超时穿透、端点/下载 URL 无 scheme 校验、下载无字节上限 | 超时钳制为正值；端点与下载 URL 仅 http(s)；下载与 b64_json 上限 20 MiB、生成响应文本上限 64 MiB |
+| `ENTITY_FQ` 手工 `basePackagePattern.replace`，绕过已算好的包名 | 改用 `ctx.vars.entityPackageName` |
+| CLI / MCP / API 三处硬编码 `VERSION = "0.1.0"` | 三面运行时读各自 package.json，版本单一来源 |
+| API 无匹配路由复用 `ADAPTER_NOT_FOUND` 码；测试缺 body 超限/example/adapters/generate 等用例 | 新增 `ROUTE_NOT_FOUND`（404）；api.test.ts 6 用例 → 13 用例 |
+
+测试从 119 增至 **139**（core +13：解码上限、provider 校验、gradle 键消费、贴图降级 warning；api +7）；外部图片输入再增 **7**（core：file provider 加载/校验/转换/降级，见 §9b.0），合计 **146**。

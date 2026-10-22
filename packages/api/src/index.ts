@@ -6,7 +6,8 @@
  */
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
-import { pathToFileURL } from "node:url";
+import { readFileSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   McmodError,
   emitPlan,
@@ -14,11 +15,15 @@ import {
   exampleSpec,
   okEnvelope,
   parseModSpec,
+  prepareTextures,
 } from "@mcmodkit/core";
 import type { ModSpecT } from "@mcmodkit/core";
 import { getAdapter, listTargets, planProject } from "@mcmodkit/adapters";
 
-const VERSION = "0.1.0";
+/** Read from the package manifest so the version can never drift from what gets published. */
+const VERSION: string = JSON.parse(
+  readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"),
+).version;
 const MAX_BODY_BYTES = 1_000_000;
 const STARTED_AT = Date.now();
 
@@ -31,6 +36,7 @@ function send(res: ServerResponse, status: number, body: unknown): void {
 function statusForError(err: unknown): number {
   const code = (err as { code?: string }).code;
   if (code === "ADAPTER_NOT_FOUND") return 404;
+  if (code === "ROUTE_NOT_FOUND") return 404;
   if (code === "SPEC_INVALID") return 400;
   return 500;
 }
@@ -116,12 +122,20 @@ export function createHandler() {
         if (!adapter) {
           throw new McmodError("ADAPTER_NOT_FOUND", "No adapter for " + spec.target.mcVersion + "/" + spec.target.loader, { target: spec.target });
         }
-        const plan = planProject(spec, adapter);
+        // Same texture behaviour as the CLI: dry runs stay offline, real runs prepare before
+        // planning. texture.file paths must be absolute here (no spec-file location to resolve from).
+        let images: Map<string, Uint8Array> | undefined;
+        if (body.dryRun !== true && spec.textures) {
+          images = await prepareTextures(spec, {
+            onProgress: (m) => process.stderr.write(m + "\n"),
+          });
+        }
+        const plan = planProject(spec, adapter, { images });
         const result = await emitPlan(plan, { outDir: body.outDir, dryRun: body.dryRun === true });
         send(res, 200, okEnvelope({ adapterId: adapter.id, modId: spec.mod.modId, outDir: result.outDir, projectDir: result.projectDir, dryRun: result.dryRun, writtenCount: result.written.length, written: result.written, warnings: plan.warnings }));
         return;
       }
-      send(res, 404, errEnvelope(new McmodError("ADAPTER_NOT_FOUND", "No route: " + method + " " + path, { method, path })));
+      send(res, 404, errEnvelope(new McmodError("ROUTE_NOT_FOUND", "No route: " + method + " " + path, { method, path })));
     } catch (err) {
       send(res, statusForError(err), errEnvelope(err));
     }

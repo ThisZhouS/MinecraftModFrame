@@ -486,5 +486,13 @@ export function lintAdapter(a: AdapterRecordT): string[] {
       problems.push(`itemBehaviors.${key} must use {{SETTINGS}} or the item ignores its properties`);
     }
   }
+  // A gradle fact no template (or projectFile path) consumes is dead data, and dead data drifts:
+  // the NeoForge modsToml once hardcoded loaderVersion = "[4,)" while the declared fact said "[2,)".
+  const consumedText = Object.values(a.templates).join("\n") + "\n" + a.projectFiles.map((f) => f.path).join("\n");
+  for (const key of Object.keys(a.gradle)) {
+    if (!consumedText.includes(`{{gradle_${key}}}`)) {
+      problems.push(`gradle.${key} is never consumed by a template or projectFile path ({{gradle_${key}}})`);
+    }
+  }
   return problems;
 }

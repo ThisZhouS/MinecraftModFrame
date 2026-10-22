@@ -64,6 +64,13 @@ export function decodePng(bytes: Uint8Array): RgbaImage {
   if (colorType !== 2 && colorType !== 6) {
     throw new Error(`decodePng: only RGB (2) and RGBA (6) are supported, got colour type ${colorType}`);
   }
+  // The bytes come from an external image API; a crafted IHDR must not make us allocate a
+  // multi-gigabyte pixel buffer. 4096px per side is far above any real generation size.
+  const MAX_SIDE = 4096;
+  if (width <= 0 || height <= 0) throw new Error(`decodePng: bad dimensions ${width}x${height}`);
+  if (width > MAX_SIDE || height > MAX_SIDE) {
+    throw new Error(`decodePng: image ${width}x${height} exceeds the ${MAX_SIDE}px per-side limit`);
+  }
   const channels = colorType === 6 ? 4 : 3;
   const raw = inflateSync(Buffer.concat(idat));
   const stride = width * channels;
