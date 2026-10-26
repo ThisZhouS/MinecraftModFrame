@@ -11,8 +11,8 @@
   "gradle": {
     "forgeGradleVersion": "6.0.54",
     "forgeVersion": "45.4.5",
-    "loaderVersionRange": "[47,)",
-    "minecraftVersionRange": "[1.20.1,1.21)",
+    "loaderVersionRange": "[45,)",
+    "minecraftVersionRange": "[1.19.4,1.20)",
     "packFormat": 13
   },
   "vanillaGroups": {
@@ -146,11 +146,11 @@
     "itemGroup": "itemGroup.{{namespace}}"
   },
   "notes": [
-    "Forge 1.20.1 uses the pre-1.21 PLURAL datapack directories: data/<ns>/loot_tables/blocks/... and data/minecraft/tags/blocks/mineable/... The singular 1.21 names do not load here.",
+    "1.19.4 uses the pre-1.21 PLURAL datapack directories: data/<ns>/loot_tables/blocks/... and data/minecraft/tags/blocks/mineable/... The singular 1.21 names do not load here.",
     "Requires Java 17 (JDK 17). The bundled Gradle 8.8 wrapper is required: ForgeGradle 6 is not compatible with Gradle 9.",
     "Mappings are Mojang official (channel 'official'); API names are mojmap (net.minecraft.world.item.Item), not MCP/yarn.",
     "Mod metadata lives in src/main/resources/META-INF/mods.toml; the @Mod annotated class is discovered by scanning, so mods.toml does not name it.",
-    "Version facts: Forge 1.20.1 recommended 47.4.10 (files.minecraftforge.net promotions_slim.json), ForgeGradle 6.0.54, Gradle 8.8 wrapper as shipped by the official 47.4.10 MDK.",
+    "Version facts: Forge 45.4.5, ForgeGradle 6.0.54, Gradle 8.8 wrapper as shipped by the official 45.4.5 MDK.",
     "Textures are not generated: add 16x16 PNGs under assets/<ns>/textures/{item,block}/<id>.png.",
     "Compile-verified trap: ItemLike is net.minecraft.world.level.ItemLike on 1.20.1 (verified with javap against the mapped Forge jar) and stays there on 1.21.1; net.minecraft.world.item.ItemLike does not exist on either version.",
     "Compile-verified: ResourceLocation.fromNamespaceAndPath(namespace, path) exists in 1.20.1 and avoids the deprecated public ResourceLocation(String, String) constructor.",

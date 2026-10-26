@@ -164,7 +164,7 @@ describe("lintAdapter", () => {
   });
   it("adapters that declare no UI templates are still clean (UI is optional)", () => {
     const a = makeFixtureAdapter();
-    for (const k of ["screenClass", "screenLineDraw", "clientBootstrap", "keybindField", "keybindRegister", "screenOpenStatement"]) {
+    for (const k of ["screenClass", "clientBootstrap", "keybindField", "keybindRegister", "screenOpenStatement"]) {
       delete (a.templates as Record<string, unknown>)[k];
     }
     expect(lintAdapter(a)).toEqual([]);
@@ -322,8 +322,21 @@ describe("ui.screens", () => {
     const screen = p.files.find((f) => f.path.endsWith("ModMainGuideScreen.java"))!.content;
     expect(screen).toContain("class ModMainGuideScreen");
     expect(screen).toContain("static final int W = 200;");
-    expect(screen).toContain("draw(screen.examplemod.guide.line.1, line 1);");
+    expect(screen).toContain('static final String[] KEYS = { "screen.examplemod.guide.line.1", "screen.examplemod.guide.line.2" };');
+    expect(screen).toContain('Component.translatable("gui.done")');
+    expect(screen).toContain("this.onClose()");
+    // UI 27.0: key mappings are skipped while a screen is open, so the screen owns its spec key.
+    expect(screen).toContain("static final int TOGGLE = Key.K;");
+    // UI 35.0: every screen carries its own find-bar lang key (both placeholder and hint).
+    expect(screen).toContain('static final String SEARCH = "screen.examplemod.guide.search";');
+    // UI 37.0: the counter tooltip gets its own key so the cycle hint stays translatable.
+    expect(screen).toContain('static final String SEARCH_CYCLE = "screen.examplemod.guide.search_cycle";');
+    const credits = p.files.find((f) => f.path.endsWith("ModMainCreditsScreen.java"))!.content;
+    expect(credits).toContain("static final int TOGGLE = -1;");
+    expect(credits).toContain('static final String SEARCH = "screen.examplemod.credits.search";');
+    expect(credits).toContain('static final String SEARCH_CYCLE = "screen.examplemod.credits.search_cycle";');
     expect(screen).not.toContain("{{");
+    expect(credits).not.toContain("{{");
 
     // Only the screen that declared a key is bound and opened.
     const bootstrap = p.files.find((f) => f.path.endsWith("ModMainClient.java"))!.content;
@@ -335,6 +348,10 @@ describe("ui.screens", () => {
     expect(lang["screen.examplemod.guide.title"]).toBe("Guide");
     expect(lang["screen.examplemod.guide.line.2"]).toBe("second");
     expect(lang["screen.examplemod.credits.title"]).toBe("Credits");
+    expect(lang["screen.examplemod.guide.search"]).toBe("Search...");
+    expect(lang["screen.examplemod.credits.search"]).toBe("Search...");
+    expect(lang["screen.examplemod.guide.search_cycle"]).toBe("Enter: next, Shift+Enter: previous");
+    expect(lang["screen.examplemod.credits.search_cycle"]).toBe("Enter: next, Shift+Enter: previous");
     expect(lang["key.examplemod.guide"]).toBe("Open Guide");
     expect(lang["key.categories.examplemod"]).toBe("Example Mod");
   });
@@ -348,7 +365,7 @@ describe("ui.screens", () => {
 
   it("fails loudly on an adapter without screen support", () => {
     const a = makeFixtureAdapter();
-    for (const k of ["screenClass", "screenLineDraw", "clientBootstrap", "keybindField", "keybindRegister", "screenOpenStatement"]) {
+    for (const k of ["screenClass", "clientBootstrap", "keybindField", "keybindRegister", "screenOpenStatement"]) {
       delete (a.templates as Record<string, unknown>)[k];
     }
     expect(() => planGeneration(parseSpecOrThrow(UI_SPEC), a)).toThrowError(McmodError);
@@ -367,7 +384,582 @@ describe("ui.screens", () => {
       expect(r.spec.ui.screens[0]!.width).toBe(220);
       expect(r.spec.ui.screens[0]!.height).toBe(140);
       expect(r.spec.ui.screens[0]!.lines).toEqual([]);
+      expect(r.spec.ui.screens[0]!.theme).toBe("vanilla");
+      expect(r.spec.ui.screens[0]!.align).toBe("left");
+      expect(r.spec.ui.screens[0]!.animation).toBe("slide");
+      expect(r.spec.ui.screens[0]!.buttons).toEqual([]);
     }
+  });
+
+  it("renders theme, accent, alignment and animation as Java constants", () => {
+    const spec = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          {
+            id: "guide",
+            lines: ["x"],
+            theme: "dark",
+            accent: "#123456",
+            align: "center",
+            animation: "none",
+          },
+        ],
+      },
+    });
+    const screen = planGeneration(spec, makeFixtureAdapter()).files.find((f) => f.path.endsWith("ModMainGuideScreen.java"))!.content;
+    expect(screen).toContain("static final int PANEL = 0xF0121418;");
+    expect(screen).toContain("static final int ACCENT = 0xFF123456;");
+    expect(screen).toContain("static final int BODY = 0xFFB8C0CC;");
+    expect(screen).toContain("static final boolean CENTER = true;");
+    expect(screen).toContain("static final int ANIM = 0;");
+  });
+
+  it("offers a high-contrast palette and a stronger pressed-link tone", () => {
+    // UI 26.0: "contrast" is an accessibility palette - fully opaque near-black panel, bright
+    // accent, near-white body and a still-readable muted note colour. Press feedback deepens the
+    // hover wash (alpha 0x66 vs 0x33) instead of introducing a second hue.
+    const spec = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          {
+            id: "guide",
+            theme: "contrast",
+            lines: [{ text: "Read more", target: "credits" }, { text: "Caveat", style: "note" }],
+          },
+          { id: "credits" },
+        ],
+      },
+    });
+    const screen = planGeneration(spec, makeFixtureAdapter()).files.find((f) =>
+      f.path.endsWith("ModMainGuideScreen.java"),
+    )!.content;
+    expect(screen).toContain("static final int PANEL = 0xFF08090B;");
+    expect(screen).toContain("static final int ACCENT = 0xFFFFD400;");
+    expect(screen).toContain("static final int BODY = 0xFFF0F0F0;");
+    expect(screen).toContain("static final int NOTE = 0xFFC9CED6;");
+    expect(screen).toContain("static final int HOVER = 0x33FFD400;");
+    expect(screen).toContain("static final int PRESSED = 0x66FFD400;");
+  });
+
+  it("maps per-line styles to Java codes while lang entries keep the plain text", () => {
+    const spec = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          {
+            id: "guide",
+            lines: [
+              "Legacy plain line",
+              { text: "Getting started", style: "heading" },
+              { text: "Mine ruby ore", style: "bullet" },
+              { text: "Default style" },
+            ],
+          },
+        ],
+      },
+    });
+    const p = planGeneration(spec, makeFixtureAdapter());
+    const screen = p.files.find((f) => f.path.endsWith("ModMainGuideScreen.java"))!.content;
+    expect(screen).toContain("static final int[] STYLES = { 0, 1, 2, 0 };");
+    expect(screen).toContain(
+      'static final String[] KEYS = { "screen.examplemod.guide.line.1", "screen.examplemod.guide.line.2", "screen.examplemod.guide.line.3", "screen.examplemod.guide.line.4" };',
+    );
+    const lang = JSON.parse(p.files.find((f) => f.path.endsWith("lang/en_us.json"))!.content);
+    expect(lang["screen.examplemod.guide.line.1"]).toBe("Legacy plain line");
+    expect(lang["screen.examplemod.guide.line.2"]).toBe("Getting started");
+    expect(lang["screen.examplemod.guide.line.3"]).toBe("Mine ruby ore");
+    expect(lang["screen.examplemod.guide.line.4"]).toBe("Default style");
+  });
+
+  it("paints note lines in the theme's muted colour while keeping links accent-coloured", () => {
+    // UI 15.0: "note" is style code 3. It is secondary text - caveats, tips - so the engine derives
+    // a per-theme muted colour instead of reusing the body tone, and the template draws a quote rule.
+    const spec = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          {
+            id: "guide",
+            theme: "dark",
+            lines: ["Body", { text: "Back up your world first", style: "note" }, { text: "Read more", style: "note", target: "credits" }],
+          },
+          { id: "credits" },
+        ],
+      },
+    });
+    const p = planGeneration(spec, makeFixtureAdapter());
+    const screen = p.files.find((f) => f.path.endsWith("ModMainGuideScreen.java"))!.content;
+    expect(screen).toContain("static final int[] STYLES = { 0, 3, 3 };");
+    expect(screen).toContain("static final int NOTE = 0xFF8A94A6;");
+    const vanilla = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: { screens: [{ id: "guide", lines: [{ text: "Hint", style: "note" }] }] },
+    });
+    const vanillaScreen = planGeneration(vanilla, makeFixtureAdapter()).files.find((f) =>
+      f.path.endsWith("ModMainGuideScreen.java"),
+    )!.content;
+    expect(vanillaScreen).toContain("static final int NOTE = 0xFF8C8C8C;");
+  });
+
+  it("paints warn lines in the theme's warm colour as style code 4", () => {
+    // UI 33.0: "warn" is style code 4. It keeps the note indentation but gets its own warm colour
+    // and a thicker rule, so a caution never reads as a plain note in any theme.
+    const spec = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: { screens: [{ id: "guide", theme: "dark", lines: ["Body", { text: "Regenerating overwrites files", style: "warn" }] }] },
+    });
+    const screen = planGeneration(spec, makeFixtureAdapter()).files.find((f) =>
+      f.path.endsWith("ModMainGuideScreen.java"),
+    )!.content;
+    expect(screen).toContain("static final int[] STYLES = { 0, 4 };");
+    expect(screen).toContain("static final int WARN = 0xFFFF8A65;");
+    const contrast = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: { screens: [{ id: "guide", theme: "contrast", lines: [{ text: "Careful", style: "warn" }] }] },
+    });
+    const contrastScreen = planGeneration(contrast, makeFixtureAdapter()).files.find((f) =>
+      f.path.endsWith("ModMainGuideScreen.java"),
+    )!.content;
+    expect(contrastScreen).toContain("static final int WARN = 0xFFFF9100;");
+  });
+
+  it("numbers step lines per section as style code 5", () => {
+    // UI 34.0: "step" is style code 5. The ordinal is a document fact, so the engine precomputes
+    // the "1." / "2." labels per logical line and restarts the count at every heading; the template
+    // only right-aligns the label in the marker gutter. Non-step lines carry an empty label so the
+    // array stays index-aligned with LINE_STYLES for the template's per-line lookup.
+    const spec = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          {
+            id: "guide",
+            lines: [
+              { text: "Steps", style: "heading" },
+              { text: "Mine ruby ore", style: "step" },
+              { text: "Craft a pickaxe", style: "step" },
+              "Between steps",
+              { text: "More steps", style: "heading" },
+              { text: "Smelt the gem", style: "step" },
+            ],
+          },
+        ],
+      },
+    });
+    const p = planGeneration(spec, makeFixtureAdapter());
+    const screen = p.files.find((f) => f.path.endsWith("ModMainGuideScreen.java"))!.content;
+    expect(screen).toContain("static final int[] STYLES = { 1, 5, 5, 0, 1, 5 };");
+    expect(screen).toContain('static final String[] STEPS = { "", "1.", "2.", "", "", "1." };');
+  });
+
+  it("rejects an unknown line style with a field-level error and keeps empty text invalid", () => {
+    const badStyle = parseModSpec({
+      ...UI_SPEC,
+      ui: { screens: [{ id: "guide", lines: ["ok", { text: "nope", style: "quote" }] }] },
+    });
+    expect(badStyle.ok).toBe(false);
+    if (!badStyle.ok) expect(badStyle.formatted).toMatch(/ui\.screens\.0\.lines\.1\.style/);
+
+    const emptyText = parseModSpec({ ...UI_SPEC, ui: { screens: [{ id: "guide", lines: [{ text: "" }] }] } });
+    expect(emptyText.ok).toBe(false);
+    if (!emptyText.ok) expect(emptyText.formatted).toMatch(/ui\.screens\.0\.lines\.0/);
+  });
+
+  it("turns a targeted line into an in-body link with a generated open action", () => {
+    const spec = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          {
+            id: "guide",
+            lines: ["Intro", { text: "Open the settings", target: "settings" }, { text: "A bullet", style: "bullet", target: "credits" }],
+          },
+          { id: "settings", title: "Settings", lines: ["s"] },
+          { id: "credits", title: "Credits", lines: ["c"] },
+        ],
+      },
+    });
+    const p = planGeneration(spec, makeFixtureAdapter());
+    const screen = p.files.find((f) => f.path.endsWith("ModMainGuideScreen.java"))!.content;
+    expect(screen).toContain("static final int[] LINKS = { -1, 1, 2 };");
+    expect(screen).toContain('static final String[] TARGETS = { "", "screen.examplemod.settings.title", "screen.examplemod.credits.title" };');
+    expect(screen).toContain("static final int HOVER = 0x33FFAA00;");
+    expect(screen).toContain("case 1: this.minecraft.setScreen(new ModMainSettingsScreen(this)); break;");
+    expect(screen).toContain("case 2: this.minecraft.setScreen(new ModMainCreditsScreen(this)); break;");
+    expect(screen).toContain("switch (line) {");
+    const lang = JSON.parse(p.files.find((f) => f.path.endsWith("lang/en_us.json"))!.content);
+    expect(lang["screen.examplemod.guide.line.2"]).toBe("Open the settings");
+    expect(lang["screen.examplemod.guide.line.3"]).toBe("A bullet");
+  });
+
+  it("rejects an unknown line link and turns a self link into back-to-top", () => {
+    const unknown = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: { screens: [{ id: "guide", lines: [{ text: "Missing", target: "nope" }] }] },
+    });
+    expect(() => planGeneration(unknown, makeFixtureAdapter())).toThrowError(
+      /ui\.screens\.0\.lines\.0\.target "nope" is not a declared screen id; available: guide/,
+    );
+
+    // UI 6.0: targeting the owning screen is the long-document "back to top" action - it scrolls
+    // the current body instead of opening a duplicate screen, and shows no screen-title tooltip.
+    const self = parseSpecOrThrow({ ...UI_SPEC, ui: { screens: [{ id: "guide", lines: ["Intro", { text: "Top", target: "guide" }] }] } });
+    const screen = planGeneration(self, makeFixtureAdapter()).files.find((f) =>
+      f.path.endsWith("ModMainGuideScreen.java"),
+    )!.content;
+    expect(screen).toContain("static final int[] LINKS = { -1, 1 };");
+    expect(screen).toContain('static final String[] TARGETS = { "", "" };');
+    expect(screen).toContain("case 1: this.scrollTo(0, true, this.scrollDurationFor(0)); break;");
+    expect(screen).not.toContain("new ModMainGuideScreen(this)");
+  });
+
+  it("jumps to an in-screen anchor and validates anchor declarations", () => {
+    const spec = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          {
+            id: "guide",
+            lines: [
+              { text: "Intro", style: "heading", anchor: "intro" },
+              "Body",
+              { text: "Jump", target: "#intro" },
+            ],
+          },
+        ],
+      },
+    });
+    const screen = planGeneration(spec, makeFixtureAdapter()).files.find((f) =>
+      f.path.endsWith("ModMainGuideScreen.java"),
+    )!.content;
+    expect(screen).toContain("case 2: this.scrollToLine(0); break;");
+    expect(screen).toContain('static final String[] TARGETS = { "", "", "" };');
+
+    const missing = parseModSpec({
+      ...UI_SPEC,
+      ui: { screens: [{ id: "guide", lines: [{ text: "Jump", target: "#nope" }] }] },
+    });
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) expect(missing.formatted).toMatch(/ui\.screens\.0\.lines\.0\.target.*#nope is not a declared anchor/);
+
+    const duplicate = parseModSpec({
+      ...UI_SPEC,
+      ui: { screens: [{ id: "guide", lines: [{ text: "A", anchor: "x" }, { text: "B", anchor: "x" }] }] },
+    });
+    expect(duplicate.ok).toBe(false);
+    if (!duplicate.ok) expect(duplicate.formatted).toMatch(/ui\.screens\.0\.lines\.1\.anchor.*duplicate anchor "x"/);
+  });
+
+  it("deep-links to an anchor on another screen", () => {
+    const spec = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          { id: "guide", lines: ["Intro", { text: "Open advanced", target: "settings#advanced" }] },
+          {
+            id: "settings",
+            lines: ["Intro", "More", { text: "Advanced", style: "heading", anchor: "advanced" }, "Body"],
+          },
+        ],
+      },
+    });
+    const guide = planGeneration(spec, makeFixtureAdapter()).files.find((f) =>
+      f.path.endsWith("ModMainGuideScreen.java"),
+    )!.content;
+    expect(guide).toContain("static final int[] LINKS = { -1, 1 };");
+    expect(guide).toContain('static final String[] TARGETS = { "", "screen.examplemod.settings.title" };');
+    // UI 32.0: the hover tooltip names the landing section too, reusing the anchored line's key.
+    expect(guide).toContain('static final String[] SECTIONS = { "", "screen.examplemod.settings.line.3" };');
+    // The target screen's constructor receives the anchor's logical line (line 2), not a row guess.
+    expect(guide).toContain("case 1: this.minecraft.setScreen(new ModMainSettingsScreen(this, 2)); break;");
+
+    // A self deep link is the same in-screen jump as "#anchor"; it must never open a duplicate screen.
+    const self = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: {
+        screens: [{ id: "guide", lines: [{ text: "Intro", anchor: "intro" }, { text: "Jump", target: "guide#intro" }] }],
+      },
+    });
+    const selfScreen = planGeneration(self, makeFixtureAdapter()).files.find((f) =>
+      f.path.endsWith("ModMainGuideScreen.java"),
+    )!.content;
+    expect(selfScreen).toContain("case 1: this.scrollToLine(0); break;");
+    expect(selfScreen).not.toContain("new ModMainGuideScreen(this, ");
+
+    const missing = parseModSpec({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          { id: "guide", lines: ["Intro", { text: "Open", target: "settings#nope" }] },
+          { id: "settings", lines: [{ text: "Advanced", anchor: "advanced" }] },
+        ],
+      },
+    });
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) {
+      expect(missing.formatted).toMatch(
+        /ui\.screens\.0\.lines\.1\.target.*undeclared anchor "nope" in screen "settings".*available: advanced/,
+      );
+    }
+  });
+
+  it("lists another screen's headings as deep links for an auto-contents screen (UI 29.0)", () => {
+    const spec = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          {
+            id: "guide",
+            lines: [
+              { text: "Welcome", style: "heading", anchor: "welcome" },
+              "Body",
+              { text: "Setup", style: "heading" },
+              "More",
+              { text: "Usage", style: "heading" },
+            ],
+          },
+          { id: "contents", lines: ["Pick a section"], contentsFor: "guide" },
+        ],
+      },
+    });
+    const p = planGeneration(spec, makeFixtureAdapter());
+    const contents = p.files.find((f) => f.path.endsWith("ModMainContentsScreen.java"))!.content;
+    // One bullet per heading, prepended ahead of the authored line. The explicit anchor is reused;
+    // headings without one get a synthetic anchor resolved to their own logical line.
+    expect(contents).toContain("static final int[] STYLES = { 2, 2, 2, 0 };");
+    expect(contents).toContain("static final int[] LINKS = { 0, 1, 2, -1 };");
+    expect(contents).toContain(
+      'static final String[] TARGETS = { "screen.examplemod.guide.title", "screen.examplemod.guide.title", "screen.examplemod.guide.title", "" };',
+    );
+    expect(contents).toContain("case 0: this.minecraft.setScreen(new ModMainGuideScreen(this, 0)); break;");
+    expect(contents).toContain("case 1: this.minecraft.setScreen(new ModMainGuideScreen(this, 2)); break;");
+    expect(contents).toContain("case 2: this.minecraft.setScreen(new ModMainGuideScreen(this, 4)); break;");
+    // Deep-link tooltips name the section: each entry maps to its heading's own line key.
+    expect(contents).toContain(
+      'static final String[] SECTIONS = { "screen.examplemod.guide.line.1", "screen.examplemod.guide.line.3", "screen.examplemod.guide.line.5", "" };',
+    );
+    // UI 31.0: entries carry the target heading's own language key, so translating or editing a
+    // title updates the index with it; the contents screen only owns keys for its authored lines.
+    expect(contents).toContain(
+      'static final String[] KEYS = { "screen.examplemod.guide.line.1", "screen.examplemod.guide.line.3", "screen.examplemod.guide.line.5", "screen.examplemod.contents.line.4" };',
+    );
+    const lang = JSON.parse(p.files.find((f) => f.path.endsWith("lang/en_us.json"))!.content);
+    expect(lang["screen.examplemod.guide.line.1"]).toBe("Welcome");
+    expect(lang["screen.examplemod.guide.line.3"]).toBe("Setup");
+    expect(lang["screen.examplemod.guide.line.5"]).toBe("Usage");
+    expect(lang["screen.examplemod.contents.line.4"]).toBe("Pick a section");
+    expect(lang["screen.examplemod.contents.line.1"]).toBeUndefined();
+
+    // Synthetic names step around declared anchors: an explicit "section_1" elsewhere must not
+    // capture the first generated entry.
+    const collision = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          {
+            id: "guide",
+            lines: [
+              { text: "Scratch", anchor: "section_1" },
+              { text: "Alpha", style: "heading" },
+              "Body",
+              { text: "Beta", style: "heading" },
+            ],
+          },
+          { id: "contents", contentsFor: "guide" },
+        ],
+      },
+    });
+    const collisionScreen = planGeneration(collision, makeFixtureAdapter()).files.find((f) =>
+      f.path.endsWith("ModMainContentsScreen.java"),
+    )!.content;
+    expect(collisionScreen).toContain("case 0: this.minecraft.setScreen(new ModMainGuideScreen(this, 1)); break;");
+    expect(collisionScreen).toContain('"screen.examplemod.guide.line.2", "screen.examplemod.guide.line.4" }');
+    expect(collisionScreen).toContain("case 1: this.minecraft.setScreen(new ModMainGuideScreen(this, 3)); break;");
+  });
+
+  it("rejects broken auto-contents declarations (agent-fixable errors)", () => {
+    const missing = parseModSpec({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          { id: "guide", lines: [{ text: "Welcome", style: "heading" }] },
+          { id: "contents", contentsFor: "nope" },
+        ],
+      },
+    });
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) {
+      expect(missing.formatted).toMatch(
+        /ui\.screens\.1\.contentsFor: contentsFor "nope" is not a declared screen id; available: guide, contents/,
+      );
+    }
+
+    const self = parseModSpec({
+      ...UI_SPEC,
+      ui: { screens: [{ id: "guide", lines: [{ text: "Welcome", style: "heading" }], contentsFor: "guide" }] },
+    });
+    expect(self.ok).toBe(false);
+    if (!self.ok) expect(self.formatted).toMatch(/ui\.screens\.0\.contentsFor.*a screen cannot list its own contents/);
+
+    const noHeadings = parseModSpec({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          { id: "guide", lines: ["Just body text"] },
+          { id: "contents", contentsFor: "guide" },
+        ],
+      },
+    });
+    expect(noHeadings.ok).toBe(false);
+    if (!noHeadings.ok) {
+      expect(noHeadings.formatted).toMatch(/ui\.screens\.1\.contentsFor.*screen "guide" has no heading lines to list/);
+    }
+
+    const chained = parseModSpec({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          { id: "guide", lines: [{ text: "Welcome", style: "heading" }] },
+          { id: "toc", contentsFor: "guide" },
+          { id: "index", contentsFor: "toc" },
+        ],
+      },
+    });
+    expect(chained.ok).toBe(false);
+    if (!chained.ok) {
+      expect(chained.formatted).toMatch(/ui\.screens\.2\.contentsFor.*"toc" is itself an auto-contents screen/);
+    }
+  });
+
+  it("emits a no-op link action for screens without line links", () => {
+    const p = planGeneration(parseSpecOrThrow(UI_SPEC), makeFixtureAdapter());
+    const screen = p.files.find((f) => f.path.endsWith("ModMainGuideScreen.java"))!.content;
+    expect(screen).toContain("static final int[] LINKS = { -1, -1 };");
+    expect(screen).toContain('static final String[] TARGETS = { "", "" };');
+    expect(screen).toContain("// This screen has no in-body links.");
+  });
+
+  it("lays out footer buttons and links navigation to the generated screen class", () => {
+    const spec = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          {
+            id: "guide",
+            title: "Guide",
+            lines: ["x"],
+            buttons: [
+              { action: "open", target: "help" },
+              { action: "close", label: "Back to game" },
+            ],
+          },
+          { id: "help", title: "Help", lines: ["y"] },
+        ],
+      },
+    });
+    const p = planGeneration(spec, makeFixtureAdapter());
+    const screen = p.files.find((f) => f.path.endsWith("ModMainGuideScreen.java"))!.content;
+    // 2 buttons earn a taller panel: the footer is centred on the live panel width and anchored to
+    // its bottom edge, so a panel clamped to a small window still keeps its buttons inside.
+    expect(screen).toContain('Component.translatable("screen.examplemod.guide.button.1")');
+    expect(screen).toContain("this.minecraft.setScreen(new ModMainHelpScreen(this))");
+    expect(screen).toContain("int footerButtonWidth0 = Math.max(1, Math.min(100, (this.panelWidth - 16 - 8 * (2 - 1)) / 2));");
+    expect(screen).toContain("int footerRowWidth0 = 2 * footerButtonWidth0 + 8 * (2 - 1);");
+    expect(screen).toContain(
+      ".bounds(left + (this.panelWidth - footerRowWidth0) / 2, top + this.panelHeight - 36 + 6, footerButtonWidth0, 20)",
+    );
+    expect(screen).toContain(
+      ".bounds(left + (this.panelWidth - footerRowWidth0) / 2 + footerButtonWidth0 + 8, top + this.panelHeight - 36 + 6, footerButtonWidth0, 20)",
+    );
+    expect(screen).toContain("this.onClose()");
+    const lang = JSON.parse(p.files.find((f) => f.path.endsWith("lang/en_us.json"))!.content);
+    expect(lang["screen.examplemod.guide.button.1"]).toBe("Open Help");
+    expect(lang["screen.examplemod.guide.button.2"]).toBe("Back to game");
+  });
+
+  it("grows the panel to fit four buttons in two rows", () => {
+    const spec = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: {
+        screens: [
+          {
+            id: "guide",
+            width: 100,
+            height: 60,
+            lines: [],
+            buttons: [
+              { action: "close", label: "A" },
+              { action: "close", label: "B" },
+              { action: "close", label: "C" },
+              { action: "close", label: "D" },
+            ],
+          },
+        ],
+      },
+    });
+    const screen = planGeneration(spec, makeFixtureAdapter()).files.find((f) => f.path.endsWith("ModMainGuideScreen.java"))!.content;
+    expect(screen).toContain("static final int W = 240;");
+    expect(screen).toContain("static final int H = 114;");
+    expect(screen).toContain("static final int FOOTER = 60;");
+    expect(screen.match(/addRenderableWidget/g)).toHaveLength(4);
+    // Both rows size from the same live panel width; the second row only has one button.
+    expect(screen).toContain("int footerButtonWidth0 = Math.max(1, Math.min(100, (this.panelWidth - 16 - 8 * (2 - 1)) / 2));");
+    expect(screen).toContain("int footerRowWidth0 = 2 * footerButtonWidth0 + 8 * (2 - 1);");
+    expect(screen).toContain("int footerButtonWidth1 = Math.max(1, Math.min(100, (this.panelWidth - 16 - 8 * (2 - 1)) / 2));");
+    expect(screen).toContain("int footerRowWidth1 = 2 * footerButtonWidth1 + 8 * (2 - 1);");
+    expect(screen).toContain(
+      ".bounds(left + (this.panelWidth - footerRowWidth0) / 2, top + this.panelHeight - 60 + 6, footerButtonWidth0, 20)",
+    );
+    expect(screen).toContain(
+      ".bounds(left + (this.panelWidth - footerRowWidth0) / 2 + footerButtonWidth0 + 8, top + this.panelHeight - 60 + 6, footerButtonWidth0, 20)",
+    );
+    expect(screen).toContain(
+      ".bounds(left + (this.panelWidth - footerRowWidth1) / 2, top + this.panelHeight - 60 + 30, footerButtonWidth1, 20)",
+    );
+    expect(screen).toContain(
+      ".bounds(left + (this.panelWidth - footerRowWidth1) / 2 + footerButtonWidth1 + 8, top + this.panelHeight - 60 + 30, footerButtonWidth1, 20)",
+    );
+  });
+
+  it("rejects an open button without a target or with a self target (agent-fixable error)", () => {
+    const noTarget = parseModSpec({ ...UI_SPEC, ui: { screens: [{ id: "guide", buttons: [{ action: "open" }] }] } });
+    expect(noTarget.ok).toBe(false);
+    if (!noTarget.ok) expect(noTarget.formatted).toMatch(/ui\.screens\.0\.buttons\.0\.target/);
+
+    const self = parseModSpec({ ...UI_SPEC, ui: { screens: [{ id: "guide", buttons: [{ action: "open", target: "guide" }] }] } });
+    expect(self.ok).toBe(false);
+    if (!self.ok) expect(self.formatted).toMatch(/cannot open itself/);
+
+    const closeWithTarget = parseModSpec({
+      ...UI_SPEC,
+      ui: { screens: [{ id: "guide", buttons: [{ action: "close", target: "help" }] }] },
+    });
+    expect(closeWithTarget.ok).toBe(false);
+  });
+
+  it("rejects duplicate screen ids and duplicate shortcut keys (agent-fixable error)", () => {
+    const dupId = parseModSpec({ ...UI_SPEC, ui: { screens: [{ id: "guide" }, { id: "guide" }] } });
+    expect(dupId.ok).toBe(false);
+    if (!dupId.ok) expect(dupId.formatted).toMatch(/ui\.screens\.1\.id.*duplicate screen id "guide"/);
+
+    const dupKey = parseModSpec({
+      ...UI_SPEC,
+      ui: { screens: [{ id: "guide", key: "K" }, { id: "credits", key: "K" }] },
+    });
+    expect(dupKey.ok).toBe(false);
+    if (!dupKey.ok) expect(dupKey.formatted).toMatch(/ui\.screens\.1\.key.*already bound to screen "guide"/);
+  });
+
+  it("rejects an open target that is not a declared screen, listing the available ids", () => {
+    const spec = parseSpecOrThrow({
+      ...UI_SPEC,
+      ui: { screens: [{ id: "guide", buttons: [{ action: "open", target: "missing" }] }] },
+    });
+    expect(() => planGeneration(spec, makeFixtureAdapter())).toThrowError(
+      /target "missing" is not a declared screen id; available: guide/,
+    );
   });
 });
 

@@ -84,6 +84,9 @@ export const LangKeysSpec = z.object({
   /** Optional: required only by adapters that support ui.screens. */
   screenTitle: z.string().optional(),
   screenLine: z.string().optional(),
+  screenButton: z.string().optional(),
+  screenSearch: z.string().optional(),
+  screenSearchCycle: z.string().optional(),
   keybind: z.string().optional(),
   keybindCategory: z.string().optional(),
   /** Optional: required only by adapters that support content.advancements. */
@@ -120,7 +123,6 @@ export const REQUIRED_TEMPLATE_KEYS = [
  */
 export const UI_TEMPLATE_KEYS = [
   "screenClass",
-  "screenLineDraw",
   "clientBootstrap",
   "keybindField",
   "keybindRegister",
@@ -128,7 +130,7 @@ export const UI_TEMPLATE_KEYS = [
 ] as const;
 
 /** Language keys the UI generator needs alongside UI_TEMPLATE_KEYS. */
-export const UI_LANG_KEYS = ["screenTitle", "screenLine", "keybind", "keybindCategory"] as const;
+export const UI_LANG_KEYS = ["screenTitle", "screenLine", "screenButton", "screenSearch", "screenSearchCycle", "keybind", "keybindCategory"] as const;
 
 /** Template keys the recipe generator needs (all-or-nothing, like the UI set). */
 export const RECIPE_TEMPLATE_KEYS = ["recipeShaped", "recipeShapeless", "recipeCooking", "recipeStonecutting"] as const;
@@ -278,8 +280,34 @@ const REQUIRED_PLACEHOLDERS: Record<string, string[]> = {
   itemsRegistryClass: ["{{ITEM_REGISTRATIONS}}"],
   blocksRegistryClass: ["{{BLOCK_REGISTRATIONS}}"],
   // UI templates (present only on screen-capable adapters).
-  screenClass: ["{{SCREEN_CLASS}}", "{{SCREEN_TITLE_KEY}}", "{{SCREEN_LINE_DRAWS}}"],
-  screenLineDraw: ["{{LINE_KEY}}", "{{LINE_N}}"],
+  screenClass: [
+    "{{SCREEN_CLASS}}",
+    "{{SCREEN_TITLE_KEY}}",
+    "{{SCREEN_KEY_CODE}}",
+    "{{LINE_KEYS_JAVA}}",
+    // The tooltip composes "<screen> › <section>" for deep links; without this array the landing
+    // section silently disappears from the hover text.
+    "{{LINE_SECTION_KEYS_JAVA}}",
+    // Step rows draw their auto-number from this array; dropping it turns "step" into a plain bullet.
+    "{{STEP_TEXT_JAVA}}",
+    "{{SCREEN_BUTTON_WIDGETS}}",
+    "{{FOOTER_HEIGHT}}",
+    "{{PANEL_COLOR}}",
+    "{{ACCENT_COLOR}}",
+    "{{BODY_COLOR}}",
+    "{{CENTER_TEXT}}",
+    "{{ANIMATION_STYLE}}",
+    "{{NOTE_COLOR}}",
+    // Style codes 3 and 4 are only distinguishable because each has its own colour; a template
+    // that drops WARN_COLOR paints warnings exactly like plain notes.
+    "{{WARN_COLOR}}",
+    // The find bar's placeholder/hint comes from the lang file; a template that hardcodes it
+    // ships an untranslatable English string.
+    "{{SCREEN_SEARCH_KEY}}",
+    // The counter tooltip spells the cycle keys out for pointer users; dropping it leaves the
+    // counter clickable but its purpose unstated.
+    "{{SCREEN_SEARCH_CYCLE_KEY}}",
+  ],
   clientBootstrap: ["{{KEYBIND_FIELDS}}", "{{KEYBIND_REGISTRATIONS}}", "{{SCREEN_OPEN_BODY}}"],
   keybindField: ["{{KEYBIND_CONST}}", "{{KEY_CODE}}", "{{KEYBIND_LANG_KEY}}"],
   keybindRegister: ["{{KEYBIND_CONST}}"],
@@ -345,6 +373,23 @@ export function lintAdapter(a: AdapterRecordT): string[] {
       problems.push("keyCodePattern must contain {{KEY}} or every generated keybinding maps to the same key");
     }
     if (a.clientSubpackage.trim() === "") problems.push("clientSubpackage must not be empty");
+    const screen = a.templates.screenClass;
+    if (screen !== undefined) {
+      // Screen.render is not version-stable: in 1.21 it renders the background itself, so a template
+      // that draws a panel first and then calls super.render has its panel painted over (and pays
+      // for a second background pass). Draw the background once, then render children explicitly.
+      if (/super\.render\(/.test(screen)) {
+        problems.push(
+          'template "screenClass" must not call super.render(): on 1.21 Screen.render re-renders the background over the panel; render this.children() instead',
+        );
+      }
+      if ((screen.match(/renderBackground\s*\(/g) ?? []).length !== 1) {
+        problems.push('template "screenClass" must call renderBackground exactly once');
+      }
+      if (!screen.includes("this.children()")) {
+        problems.push('template "screenClass" must render this.children() so buttons stay visible and animate with the panel');
+      }
+    }
   }
   // Recipes: the datapack directory is the only version difference, so hold it in contentPaths.
   const recipeTemplates = RECIPE_TEMPLATE_KEYS.filter((k) => k in a.templates);

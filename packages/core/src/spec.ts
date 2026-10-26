@@ -250,23 +250,231 @@ export const ContentSpec = z.object({
   advancements: z.array(AdvancementSpec).default([]),
 }).strict();
 
-/** One generated in-game screen. Layout numbers are data so agents can adjust UI without editing Java. */
-export const ScreenSpec = z.object({
-  id: idField("screen"),
-  /** Window title; default derived from the id. */
-  title: z.string().min(1).optional(),
-  /** Single letter (A-Z) that opens this screen; absent = generated but not bound to a key. */
-  key: z.string().regex(/^[A-Z]$/, "key must be a single uppercase letter, e.g. K").optional(),
-  /** Translation keys appended verbatim are not allowed; use lines for text. */
-  width: z.number().int().min(80).max(1200).default(220),
-  height: z.number().int().min(60).max(1200).default(140),
-  /** Body text, one line per entry, rendered top-down. */
-  lines: z.array(z.string().min(1)).default([]),
+export const SCREEN_THEMES = ["vanilla", "dark", "light", "contrast"] as const;
+export const SCREEN_ANIMATIONS = ["none", "fade", "slide"] as const;
+export const SCREEN_LINE_STYLES = ["body", "heading", "bullet", "note", "warn", "step"] as const;
+
+/** A screen id, "screen#anchor" for a named line on another screen, or "#anchor" on this screen. */
+const LINK_TARGET_RE = /^(?:#[a-z][a-z0-9_]*|[a-z][a-z0-9_]*(?:#[a-z][a-z0-9_]*)?)$/;
+
+/**
+ * One body line: a plain string is body text. The object form adds a visual role - "heading"
+ * paints the row in the accent colour with a left rule, "bullet" indents it and draws a marker on
+ * the first wrapped row, "note" indents it in a muted colour behind a quote rule so caveats read
+ * as secondary text without a separate callout widget, "warn" keeps the note's indent but
+ * swaps in the theme's warm warn colour behind a thicker rule so cautions stand apart from plain
+ * notes at a glance, and "step" reuses the bullet's indent but numbers the first row ("1.", "2.", …)
+ * so ordered instructions read as a checklist; step numbering restarts at every heading. Wrapped
+ * continuation rows keep the same
+ * style and indent. An optional
+ * `target` turns the whole line into an in-body link to a screen in the same spec (optionally
+ * "screen#anchor" to land on a named line there), or to an `#anchor` declared on another line of
+ * this screen. `anchor` marks such a jump target. Links are
+ * drawn in the accent colour and underline the logical line while the pointer is over it.
+ * Targeting the screen that owns the line means "back to top": it scrolls the current body to
+ * the start instead of opening a second copy of the same screen.
+ * Strings are normalized to the object form so every consumer sees {text, style} and a bad style
+ * still reports ui.screens.<n>.lines.<i>.style instead of a union error at the line index.
+ */
+export const ScreenLineSpec = z.preprocess(
+  (line) => (typeof line === "string" ? { text: line } : line),
+  z
+    .object({
+      text: z.string().min(1),
+      style: z.enum(SCREEN_LINE_STYLES).default("body"),
+      /** Screen id (optionally "screen#anchor"), or "#anchor" for a line in this screen. */
+      target: z.string().regex(LINK_TARGET_RE, "target must be a screen id, screen#anchor, or #anchor").optional(),
+      /** Names this line as an in-screen jump target for "#name" links. */
+      anchor: idField("anchor").optional(),
+    })
+    .strict(),
+);
+
+/**
+ * A footer button. "open" navigates to another screen in the same spec and keeps a parent link,
+ * so ESC / the default close action returns to the previous screen instead of dropping to the game.
+ */
+export const ScreenButtonSpec = z.object({
+  /** Caption; absent = a sensible default ("Done" or "Open <target>"). */
+  label: z.string().min(1).optional(),
+  action: z.enum(["close", "open"]).default("close"),
+  /** Screen id in this spec; required for action "open" and rejected otherwise. */
+  target: idField("screen").optional(),
 }).strict();
 
-export const UiSpec = z.object({
-  screens: z.array(ScreenSpec).default([]),
-}).strict();
+/**
+ * One generated in-game screen. Layout numbers and look are data so agents can adjust UI without
+ * editing Java. Long lines are wrapped by the generated screen and overflow scrolls with the wheel.
+ */
+export const ScreenSpec = z
+  .object({
+    id: idField("screen"),
+    /** Window title; default derived from the id. */
+    title: z.string().min(1).optional(),
+    /** Single letter (A-Z) that opens this screen; absent = generated but not bound to a key. */
+    key: z.string().regex(/^[A-Z]$/, "key must be a single uppercase letter, e.g. K").optional(),
+    /** Translation keys appended verbatim are not allowed; use lines for text. */
+    width: z.number().int().min(80).max(1200).default(220),
+    /** Minimum panel height; the generator grows it when the footer needs more room. */
+    height: z.number().int().min(60).max(1200).default(140),
+    /** Body text, one line per entry, wrapped at the panel width. Entries may be strings or {text,style}. */
+    lines: z.array(ScreenLineSpec).default([]),
+    /**
+     * Auto table of contents: lists every heading of the named screen as a bullet deep link ahead
+     * of this screen's own lines. Headings without an explicit anchor get a synthetic one
+     * ("section_N"), so an index costs one field instead of hand-maintained links.
+     */
+    contentsFor: idField("screen").optional(),
+    /** Panel palette. "accent" overrides only the highlight colour. */
+    theme: z.enum(SCREEN_THEMES).default("vanilla"),
+    accent: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'accent must look like "#8a2be2"').optional(),
+    /** Body text alignment; titles are always centred. */
+    align: z.enum(["left", "center"]).default("left"),
+    /** Entrance animation. "slide" moves panel, text and buttons together. */
+    animation: z.enum(SCREEN_ANIMATIONS).default("slide"),
+    /** Footer buttons; empty = one Done button that closes (or returns to the parent screen). */
+    buttons: z.array(ScreenButtonSpec).max(4).default([]),
+  })
+  .strict()
+  .superRefine((screen, ctx) => {
+    if (screen.contentsFor !== undefined && screen.contentsFor === screen.id) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["contentsFor"],
+        message: "a screen cannot list its own contents; point contentsFor at another screen",
+      });
+    }
+    screen.buttons.forEach((button, i) => {
+      if (button.action === "open" && button.target === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["buttons", i, "target"],
+          message: 'action "open" requires target (a screen id in this spec)',
+        });
+      }
+      if (button.action === "close" && button.target !== undefined) {
+        ctx.addIssue({ code: "custom", path: ["buttons", i, "target"], message: 'target is only used by action "open"' });
+      }
+      if (button.target !== undefined && button.target === screen.id) {
+        ctx.addIssue({ code: "custom", path: ["buttons", i, "target"], message: "a screen cannot open itself" });
+      }
+    });
+    const anchors = new Map<string, number>();
+    screen.lines.forEach((line, i) => {
+      if (line.anchor === undefined) return;
+      const first = anchors.get(line.anchor);
+      if (first !== undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["lines", i, "anchor"],
+          message: `duplicate anchor "${line.anchor}" (already declared on line ${first + 1})`,
+        });
+      } else {
+        anchors.set(line.anchor, i);
+      }
+    });
+    screen.lines.forEach((line, i) => {
+      if (line.target === undefined || !line.target.startsWith("#")) return;
+      const anchor = line.target.slice(1);
+      if (!anchors.has(anchor)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["lines", i, "target"],
+          message: `#${anchor} is not a declared anchor in this screen; available: ${[...anchors.keys()].join(", ") || "<none>"}`,
+        });
+      }
+    });
+  });
+
+export const UiSpec = z
+  .object({
+    screens: z.array(ScreenSpec).default([]),
+  })
+  .strict()
+  .superRefine((ui, ctx) => {
+    // A screen id names its generated class and lang keys; a key names the one keybind that opens
+    // it. Letting either collide would only surface later as an overwritten file or a dead keybind.
+    const byId = new Map<string, number>();
+    const byKey = new Map<string, number>();
+    ui.screens.forEach((screen, i) => {
+      const prevId = byId.get(screen.id);
+      if (prevId === undefined) {
+        byId.set(screen.id, i);
+      } else {
+        ctx.addIssue({
+          code: "custom",
+          path: ["screens", i, "id"],
+          message: `duplicate screen id "${screen.id}" (also declared at screens.${prevId}); ids name the generated class and lang keys, so they must be unique`,
+        });
+      }
+      if (screen.key === undefined) return;
+      const prevKey = byKey.get(screen.key);
+      if (prevKey === undefined) {
+        byKey.set(screen.key, i);
+      } else {
+        ctx.addIssue({
+          code: "custom",
+          path: ["screens", i, "key"],
+          message: `key ${screen.key} is already bound to screen "${ui.screens[prevKey]!.id}" at screens.${prevKey}; give each screen its own key`,
+        });
+      }
+    });
+    ui.screens.forEach((screen, i) => {
+      if (screen.contentsFor === undefined) return;
+      const targetIndex = byId.get(screen.contentsFor);
+      if (targetIndex === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["screens", i, "contentsFor"],
+          message: `contentsFor "${screen.contentsFor}" is not a declared screen id; available: ${
+            [...byId.keys()].join(", ") || "<none>"
+          }`,
+        });
+        return;
+      }
+      const target = ui.screens[targetIndex]!;
+      if (target.id === screen.id) return;
+      if (target.contentsFor !== undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["screens", i, "contentsFor"],
+          message: `contentsFor "${target.id}" is itself an auto-contents screen; list the headings directly instead of chaining`,
+        });
+        return;
+      }
+      if (!target.lines.some((line) => line.style === "heading")) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["screens", i, "contentsFor"],
+          message: `screen "${target.id}" has no heading lines to list; add at least one line with style "heading"`,
+        });
+      }
+    });
+    const anchorsByScreen = new Map(
+      ui.screens.map((screen) => [
+        screen.id,
+        new Set(screen.lines.flatMap((line) => (line.anchor === undefined ? [] : [line.anchor]))),
+      ]),
+    );
+    ui.screens.forEach((screen, i) => {
+      screen.lines.forEach((line, j) => {
+        if (line.target === undefined || line.target.startsWith("#")) return;
+        const hash = line.target.indexOf("#");
+        if (hash < 0) return;
+        const targetId = line.target.slice(0, hash);
+        if (!byId.has(targetId)) return;
+        const anchor = line.target.slice(hash + 1);
+        if (anchorsByScreen.get(targetId)!.has(anchor)) return;
+        ctx.addIssue({
+          code: "custom",
+          path: ["screens", i, "lines", j, "target"],
+          message: `target "${line.target}" refers to undeclared anchor "${anchor}" in screen "${targetId}"; available: ${
+            [...anchorsByScreen.get(targetId)!].join(", ") || "<none>"
+          }`,
+        });
+      });
+    });
+  });
 
 export const ModSpec = z.object({
   schemaVersion: z.literal(1),

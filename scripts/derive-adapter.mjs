@@ -24,7 +24,7 @@ const keepOptional = flags.includes("--keep-optional");
 
 const OPTIONAL_TEMPLATES = [
   // UI
-  "screenClass", "screenLineDraw", "clientBootstrap", "keybindField", "keybindRegister", "screenOpenStatement",
+  "screenClass", "clientBootstrap", "keybindField", "keybindRegister", "screenOpenStatement",
   // recipes
   "recipeShaped", "recipeShapeless", "recipeCooking", "recipeStonecutting",
   // advancements
@@ -37,7 +37,7 @@ const OPTIONAL_TEMPLATES = [
 ];
 const OPTIONAL_CONTENT_PATHS = ["recipe", "advancement", "entityLootTable"];
 const OPTIONAL_LANG_KEYS = [
-  "screenTitle", "screenLine", "keybind", "keybindCategory",
+  "screenTitle", "screenLine", "screenButton", "keybind", "keybindCategory",
   "advancementTitle", "advancementDescription", "entity",
 ];
 

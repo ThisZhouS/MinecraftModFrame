@@ -9,8 +9,17 @@
  * Usage:
  *   node scripts/verify-build.mjs                       # all adapters, auto-detected toolchains
  *   node scripts/verify-build.mjs --adapter forge-1.20.1
+ *   node scripts/verify-build.mjs --spec docs/examples/ui2-demo.json --adapter fabric-1.21.1
  *   node scripts/verify-build.mjs --gradle "8=C:/tools/gradle-8.8/bin/gradle.bat,9=C:/tools/gradle-9.5.1/bin/gradle.bat" \
  *                                --java-home-17 C:/tools/jdk17 --java-home-21 C:/tools/jdk21
+ *   node scripts/verify-build.mjs --adapter forge-1.21.4 \
+ *                                --gradle-arg -Porg.gradle.java.installations.paths=C:/tools/jdk-25
+ *
+ * --spec compiles an arbitrary spec instead of the bundled example; its target and modId are
+ * overridden per adapter so one UI/feature spec can be checked on every toolchain.
+ *
+ * --gradle-arg is passed through verbatim and may repeat (e.g. registering a local JDK 25 for
+ * ForgeGradle 7 so the foojay resolver does not download one).
  *
  * --gradle is either one path (used for every adapter) or a "major=path" list keyed by the major
  * version of the adapter's declared gradleWrapperVersion: each plugin family needs its own Gradle
@@ -27,11 +36,13 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(repoRoot, "packages", "cli", "dist", "index.js");
 
 function parseArgs(argv) {
-  const out = { adapters: [], javaHomes: {}, work: join(repoRoot, "Temp", "verify-build") };
+  const out = { adapters: [], javaHomes: {}, gradleArgs: [], work: join(repoRoot, "Temp", "verify-build") };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === "--adapter") out.adapters.push(argv[++i]);
+    else if (a === "--spec") out.spec = resolve(argv[++i]);
     else if (a === "--gradle") out.gradle = argv[++i];
+    else if (a === "--gradle-arg") out.gradleArgs.push(argv[++i]);
     else if (a === "--work") out.work = resolve(argv[++i]);
     else if (a.startsWith("--java-home-")) out.javaHomes[a.slice("--java-home-".length)] = argv[++i];
     else if (a === "--java-home") out.javaHomes.default = argv[++i];
@@ -83,10 +94,15 @@ for (const target of selected) {
   const dir = join(args.work, target.id);
   mkdirSync(dir, { recursive: true });
   const specPath = join(dir, "spec.json");
-  const example = cliJson(["example", "-o", specPath]);
-  if (example.code !== 0) { results.push({ id: target.id, status: "FAIL", detail: "example spec failed" }); continue; }
-  // Point the example spec at this adapter, then generate a real project from it.
-  const specText = JSON.parse(readFileSync(specPath, "utf8"));
+  let specText;
+  if (args.spec) {
+    specText = JSON.parse(readFileSync(args.spec, "utf8"));
+  } else {
+    const example = cliJson(["example", "-o", specPath]);
+    if (example.code !== 0) { results.push({ id: target.id, status: "FAIL", detail: "example spec failed" }); continue; }
+    specText = JSON.parse(readFileSync(specPath, "utf8"));
+  }
+  // Point the spec at this adapter, then generate a real project from it.
   specText.target = { mcVersion: target.mcVersion, loader: target.loader };
   specText.mod = specText.mod ?? {};
   specText.mod.modId = `verify${target.loader}`;
@@ -113,7 +129,7 @@ for (const target of selected) {
   }
   const started = Date.now();
   const env = { ...process.env, JAVA_HOME: javaHome };
-  const build = run(gradlePath, ["build", "--console=plain", "--no-daemon"], { cwd: projectDir, env });
+  const build = run(gradlePath, ["build", "--console=plain", "--no-daemon", ...args.gradleArgs], { cwd: projectDir, env });
   const logPath = join(dir, "build.log");
   writeFileSync(logPath, build.stdout + build.stderr, "utf8");
   const ok = build.code === 0 && /BUILD SUCCESSFUL/.test(build.stdout + build.stderr);

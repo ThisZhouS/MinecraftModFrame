@@ -317,16 +317,35 @@ interface UiGenOut {
   langEntries: Record<string, string>;
 }
 
+/** Panel palettes as ARGB. Kept here (not in adapters) because colour is not a version fact. */
+const SCREEN_PALETTES = {
+  vanilla: { panel: 0xe61c1c1c, border: 0xff4a4a4a, accent: 0xffffaa00, title: 0xffffffff, body: 0xffb8b8b8, note: 0xff8c8c8c, warn: 0xffff7043 },
+  dark: { panel: 0xf0121418, border: 0xff2a2e36, accent: 0xff7c5cff, title: 0xffffffff, body: 0xffb8c0cc, note: 0xff8a94a6, warn: 0xffff8a65 },
+  light: { panel: 0xf2f2f2f2, border: 0xffa8a8a8, accent: 0xff1f6feb, title: 0xff141414, body: 0xff333333, note: 0xff6b6b6b, warn: 0xffe64a19 },
+  // Fully opaque near-black keeps text contrast stable over bright or busy scenes.
+  contrast: { panel: 0xff08090b, border: 0xffb4b8c0, accent: 0xffffd400, title: 0xffffffff, body: 0xfff0f0f0, note: 0xffc9ced6, warn: 0xffff9100 },
+} as const;
+
+const SCREEN_ANIMATION_CODES = { none: 0, fade: 1, slide: 2 } as const;
+const SCREEN_LINE_STYLE_CODES = { body: 0, heading: 1, bullet: 2, note: 3, warn: 4, step: 5 } as const;
+
+/** ARGB as a Java int literal (8 hex digits, valid even when the sign bit is set). */
+function javaColor(value: number): string {
+  return "0x" + (value >>> 0).toString(16).toUpperCase().padStart(8, "0");
+}
+
 /**
  * UI generator: turns spec.ui.screens into a client Screen class per screen plus one client
  * bootstrap that binds keys and opens the screens. Every loader/version detail (imports, event
- * classes, key input API, renderBackground signature) comes from adapter templates, so the engine
- * stays free of version branches (Principle 1).
+ * classes, key input API, renderBackground/render order, scroll signature) comes from adapter
+ * templates, so the engine stays free of version branches (Principle 1).
  */
 function genUi(ctx: GenContext, javaDir: string, rendererRegistrations: string[] = []): UiGenOut {
   const out: UiGenOut = { files: [], langEntries: {} };
-  const screens = ctx.spec.ui.screens;
-  if (screens.length === 0 && rendererRegistrations.length === 0) return out;
+  if (ctx.spec.ui.screens.length === 0 && rendererRegistrations.length === 0) return out;
+  // Work on copies: an auto-contents screen writes synthetic anchors onto the target's headings,
+  // and the parsed spec must stay reusable for other adapters in the same run.
+  const screens = ctx.spec.ui.screens.map((screen) => ({ ...screen, lines: screen.lines.map((line) => ({ ...line })) }));
   const a = ctx.adapter;
   if (screens.length > 0 && (a.templates.screenClass === undefined || a.langKeys.screenTitle === undefined)) {
     throw new McmodError(
@@ -335,25 +354,230 @@ function genUi(ctx: GenContext, javaDir: string, rendererRegistrations: string[]
       { adapterId: a.id },
     );
   }
+  const screenLineKey = (screenId: string, index: number) =>
+    renderTemplate(a.langKeys.screenLine!, { namespace: ctx.vars.namespace!, id: screenId, n: String(index + 1) }, "langKeys.screenLine");
+  // Auto-contents entries point at another screen's headings, so they reuse those headings' own
+  // language keys instead of duplicating the text: editing a title updates the index with it.
+  const lineKeyByLine = new Map<object, string>();
+  for (const screen of screens) {
+    if (screen.contentsFor === undefined) continue;
+    const target = screens.find((s) => s.id === screen.contentsFor);
+    if (target === undefined) {
+      throw new McmodError(
+        "SPEC_INVALID",
+        `ui screen "${screen.id}" lists contentsFor "${screen.contentsFor}", which is not a declared screen id; available: ${
+          screens.map((s) => s.id).join(", ") || "<none>"
+        }`,
+      );
+    }
+    // Reuse explicit anchors; give the rest a stable synthetic name that cannot collide with a
+    // declared one. The entries are ordinary bullet deep links from here on.
+    const used = new Set(target.lines.flatMap((line) => (line.anchor === undefined ? [] : [line.anchor])));
+    let heading = 0;
+    const entries: { text: string; style: "bullet"; target: string }[] = [];
+    for (const [i, line] of target.lines.entries()) {
+      if (line.style !== "heading") continue;
+      if (line.anchor === undefined) {
+        heading += 1;
+        let anchor = `section_${heading}`;
+        let suffix = 2;
+        while (used.has(anchor)) anchor = `section_${heading}_${suffix++}`;
+        used.add(anchor);
+        line.anchor = anchor;
+      }
+      const entry: { text: string; style: "bullet"; target: string } = { text: line.text, style: "bullet", target: `${target.id}#${line.anchor}` };
+      entries.push(entry);
+      lineKeyByLine.set(entry, screenLineKey(target.id, i));
+    }
+    screen.lines = [...entries, ...screen.lines];
+  }
+  const classByScreen = new Map(screens.map((s) => [s.id, `${a.mainClassSimpleName}${toPascalCase(s.id)}Screen`]));
+  const anchorLineByScreen = new Map(
+    screens.map((s) => [
+      s.id,
+      new Map(s.lines.flatMap((line, i) => (line.anchor === undefined ? [] : [[line.anchor, i] as const]))),
+    ]),
+  );
+  for (const [si, screen] of screens.entries()) {
+    for (const [bi, button] of screen.buttons.entries()) {
+      if (button.action !== "open") continue;
+      if (!classByScreen.has(button.target!)) {
+        throw new McmodError(
+          "SPEC_INVALID",
+          `ui.screens.${si}.buttons.${bi}.target "${button.target}" is not a declared screen id; available: ${
+            [...classByScreen.keys()].join(", ") || "<none>"
+          }`,
+        );
+      }
+    }
+    for (const [li, line] of screen.lines.entries()) {
+      if (line.target === undefined) continue;
+      if (line.target.startsWith("#")) continue;
+      const hash = line.target.indexOf("#");
+      const targetId = hash < 0 ? line.target : line.target.slice(0, hash);
+      if (!classByScreen.has(targetId)) {
+        throw new McmodError(
+          "SPEC_INVALID",
+          `ui.screens.${si}.lines.${li}.target "${targetId}" is not a declared screen id; available: ${
+            [...classByScreen.keys()].join(", ") || "<none>"
+          }`,
+        );
+      }
+      if (hash >= 0) {
+        const anchor = line.target.slice(hash + 1);
+        if (!anchorLineByScreen.get(targetId)!.has(anchor)) {
+          throw new McmodError(
+            "SPEC_INVALID",
+            `ui.screens.${si}.lines.${li}.target "${line.target}" refers to undeclared anchor "${anchor}" in screen "${targetId}"; available: ${
+              [...anchorLineByScreen.get(targetId)!.keys()].join(", ") || "<none>"
+            }`,
+          );
+        }
+      }
+    }
+    if (screen.buttons.length > 0 && a.langKeys.screenButton === undefined) {
+      throw new McmodError(
+        "ADAPTER_INVALID",
+        `Adapter ${a.id} has no langKeys.screenButton but the spec declares screen buttons`,
+        { adapterId: a.id },
+      );
+    }
+  }
   const fieldLines: string[] = [];
   const registerLines: string[] = [];
   const openLines: string[] = [];
+  const titleKeyByScreen = new Map(
+    screens.map((s) => [
+      s.id,
+      renderTemplate(a.langKeys.screenTitle!, { namespace: ctx.vars.namespace!, id: s.id }, "langKeys.screenTitle"),
+    ]),
+  );
   for (const screen of screens) {
-    const className = `${a.mainClassSimpleName}${toPascalCase(screen.id)}Screen`;
+    const className = classByScreen.get(screen.id)!;
     const display = screen.title ?? toDisplayName(screen.id);
-    const titleKey = renderTemplate(a.langKeys.screenTitle!, { namespace: ctx.vars.namespace!, id: screen.id }, "langKeys.screenTitle");
+    const titleKey = titleKeyByScreen.get(screen.id)!;
+    // The find bar's placeholder and hint share one key, so the bar stays translatable.
+    const searchKey = renderTemplate(a.langKeys.screenSearch!, { namespace: ctx.vars.namespace!, id: screen.id }, "langKeys.screenSearch");
+    // The counter tooltip is the pointer user's only hint that the counter itself cycles matches.
+    const searchCycleKey = renderTemplate(a.langKeys.screenSearchCycle!, { namespace: ctx.vars.namespace!, id: screen.id }, "langKeys.screenSearchCycle");
+    // The screen closes itself on this key: key mappings never fire while a Screen is open.
+    const screenKeyCode = screen.key === undefined ? undefined : renderTemplate(a.keyCodePattern, { KEY: screen.key }, "keyCodePattern");
     out.langEntries[titleKey] = display;
-    const lineDraws = screen.lines
-      .map((text, i) => {
-        const lineKey = renderTemplate(
-          a.langKeys.screenLine!,
-          { namespace: ctx.vars.namespace!, id: screen.id, n: String(i + 1) },
-          "langKeys.screenLine",
+    out.langEntries[searchKey] = "Search...";
+    out.langEntries[searchCycleKey] = "Enter: next, Shift+Enter: previous";
+    const lineKeys: string[] = [];
+    const lineStyles: number[] = [];
+    const lineLinks: number[] = [];
+    const lineTargetKeys: string[] = [];
+    const lineSectionKeys: string[] = [];
+    const lineStepTexts: string[] = [];
+    const linkCases: string[] = [];
+    const anchorLineByAnchor = anchorLineByScreen.get(screen.id)!;
+    // Step numbers restart at each heading so every section reads as its own ordered list.
+    let stepNo = 0;
+    screen.lines.forEach((line, i) => {
+      lineStyles.push(SCREEN_LINE_STYLE_CODES[line.style]);
+      if (line.style === "heading") stepNo = 0;
+      if (line.style === "step") {
+        stepNo += 1;
+        lineStepTexts.push(`${stepNo}.`);
+      } else {
+        lineStepTexts.push("");
+      }
+      lineLinks.push(line.target === undefined ? -1 : i);
+      // Deep links also name their landing section: the tooltip composes "<screen> › <section>"
+      // from the anchored line's own key, so the hover text says where inside the screen it lands.
+      let lineSectionKey = "";
+      if (line.target === undefined) {
+        lineTargetKeys.push("");
+      } else if (line.target.startsWith("#")) {
+        // In-screen jump: no screen title to show, and the template maps the logical line to its row.
+        lineTargetKeys.push("");
+        linkCases.push(`\t\t\tcase ${i}: this.scrollToLine(${anchorLineByAnchor.get(line.target.slice(1))!}); break;`);
+      } else if (line.target.includes("#")) {
+        // Cross-screen deep link: open the target screen with the anchor's logical line, so its
+        // init() can scroll (and flash) the section after the layout caches exist. A self-target
+        // is the same jump as "#anchor"; never open a duplicate copy of the current screen.
+        const hash = line.target.indexOf("#");
+        const targetId = line.target.slice(0, hash);
+        const anchorLine = anchorLineByScreen.get(targetId)!.get(line.target.slice(hash + 1))!;
+        if (targetId === screen.id) {
+          lineTargetKeys.push("");
+          linkCases.push(`\t\t\tcase ${i}: this.scrollToLine(${anchorLine}); break;`);
+        } else {
+          lineTargetKeys.push(titleKeyByScreen.get(targetId)!);
+          lineSectionKey = screenLineKey(targetId, anchorLine);
+          linkCases.push(
+            `\t\t\tcase ${i}: this.minecraft.setScreen(new ${classByScreen.get(targetId)}(this, ${anchorLine})); break;`,
+          );
+        }
+      } else if (line.target === screen.id) {
+        // Self link = back to top: reuse the same smooth scroll, and show no screen-title tooltip.
+        lineTargetKeys.push("");
+        linkCases.push(`\t\t\tcase ${i}: this.scrollTo(0, true, this.scrollDurationFor(0)); break;`);
+      } else {
+        lineTargetKeys.push(titleKeyByScreen.get(line.target)!);
+        linkCases.push(`\t\t\tcase ${i}: this.minecraft.setScreen(new ${classByScreen.get(line.target)}(this)); break;`);
+      }
+      lineSectionKeys.push(lineSectionKey);
+      const lineKey = lineKeyByLine.get(line) ?? screenLineKey(screen.id, i);
+      out.langEntries[lineKey] = line.text;
+      lineKeys.push(lineKey);
+    });
+    const lineLinkActions =
+      linkCases.length === 0
+        ? "\t\t// This screen has no in-body links."
+        : `\t\tswitch (line) {\n${linkCases.join("\n")}\n\t\t\tdefault: break;\n\t\t}`;
+
+    const buttons: { label?: string; action: "close" | "open"; target?: string }[] =
+      screen.buttons.length > 0 ? screen.buttons : [{ action: "close" }];
+    const perRow = Math.min(buttons.length, 2);
+    const rows = Math.ceil(buttons.length / perRow);
+    const footerHeight = rows * 24 + 12;
+    // The panel grows to fit the footer and one text row; longer bodies scroll instead of growing
+    // past the window. Buttons also set a floor for the width so their labels never clip.
+    const resolvedHeight = Math.max(screen.height, 42 + 12 + footerHeight);
+    const resolvedWidth = Math.max(screen.width, perRow * 100 + (perRow - 1) * 8 + 32);
+    const buttonWidgets: string[] = [];
+    buttons.forEach((button, i) => {
+      const row = Math.floor(i / perRow);
+      const col = i % perRow;
+      const rowCount = Math.min(perRow, buttons.length - row * perRow);
+      // Buttons are laid out from the live panel size (not the compile-time preferred size), so a
+      // panel clamped to a small window keeps its footer centred and inside the borders. Two 100px
+      // buttons need 240px; below that each row shrinks its buttons instead of spilling out.
+      if (col === 0) {
+        buttonWidgets.push(
+          `\t\tint footerButtonWidth${row} = Math.max(1, Math.min(100, (this.panelWidth - 16 - 8 * (${rowCount} - 1)) / ${rowCount}));`,
+          `\t\tint footerRowWidth${row} = ${rowCount} * footerButtonWidth${row} + 8 * (${rowCount} - 1);`,
         );
-        out.langEntries[lineKey] = text;
-        return renderTemplate(a.templates.screenLineDraw!, { ...ctx.vars, LINE_KEY: lineKey, LINE_N: String(i + 1) }, "screenLineDraw");
-      })
-      .join("\n");
+      }
+      const x = `left + (this.panelWidth - footerRowWidth${row}) / 2${col === 0 ? "" : ` + footerButtonWidth${row} + 8`}`;
+      const y = `top + this.panelHeight - ${footerHeight} + ${6 + row * 24}`;
+      const isImplicit = screen.buttons.length === 0;
+      const labelKey = isImplicit
+        ? "gui.done"
+        : renderTemplate(
+            a.langKeys.screenButton!,
+            { namespace: ctx.vars.namespace!, id: screen.id, n: String(i + 1) },
+            "langKeys.screenButton",
+          );
+      if (!isImplicit) {
+        const targetScreen = button.target === undefined ? undefined : screens.find((s) => s.id === button.target);
+        const fallback = button.action === "close" ? "Done" : `Open ${targetScreen?.title ?? toDisplayName(button.target ?? "")}`;
+        out.langEntries[labelKey] = button.label ?? fallback;
+      }
+      const action = button.action === "open"
+        ? `button -> this.minecraft.setScreen(new ${classByScreen.get(button.target!)}(this))`
+        : "button -> this.onClose()";
+      buttonWidgets.push(
+        `\t\tthis.addRenderableWidget(Button.builder(Component.translatable("${labelKey}"), ${action})\n` +
+        `\t\t\t.bounds(${x}, ${y}, footerButtonWidth${row}, 20)\n` +
+        `\t\t\t.build());`,
+      );
+    });
+    const palette = SCREEN_PALETTES[screen.theme];
+    const accent = screen.accent === undefined ? palette.accent : (0xff000000 | Number.parseInt(screen.accent.slice(1), 16));
     out.files.push({
       path: `${javaDir}${a.clientSubpackage}/${className}.java`,
       content: renderTemplate(
@@ -363,9 +587,31 @@ function genUi(ctx: GenContext, javaDir: string, rendererRegistrations: string[]
           SCREEN_CLASS: className,
           SCREEN_ID: screen.id,
           SCREEN_TITLE_KEY: titleKey,
-          SCREEN_WIDTH: String(screen.width),
-          SCREEN_HEIGHT: String(screen.height),
-          SCREEN_LINE_DRAWS: lineDraws,
+          SCREEN_SEARCH_KEY: searchKey,
+          SCREEN_SEARCH_CYCLE_KEY: searchCycleKey,
+          SCREEN_WIDTH: String(resolvedWidth),
+          SCREEN_HEIGHT: String(resolvedHeight),
+          LINE_KEYS_JAVA: `{ ${lineKeys.map((k) => `"${k}"`).join(", ")} }`,
+          LINE_STYLES_JAVA: `{ ${lineStyles.join(", ")} }`,
+          LINE_LINKS_JAVA: `{ ${lineLinks.join(", ")} }`,
+          LINE_TARGET_KEYS_JAVA: `{ ${lineTargetKeys.map((k) => `"${k}"`).join(", ")} }`,
+          LINE_SECTION_KEYS_JAVA: `{ ${lineSectionKeys.map((k) => `"${k}"`).join(", ")} }`,
+          STEP_TEXT_JAVA: `{ ${lineStepTexts.map((t) => `"${t}"`).join(", ")} }`,
+          LINE_LINK_ACTIONS: lineLinkActions,
+          SCREEN_BUTTON_WIDGETS: buttonWidgets.join("\n"),
+          FOOTER_HEIGHT: String(footerHeight),
+          SCREEN_KEY_CODE: screenKeyCode ?? "-1",
+          PANEL_COLOR: javaColor(palette.panel),
+          BORDER_COLOR: javaColor(palette.border),
+          ACCENT_COLOR: javaColor(accent),
+          LINK_HOVER_COLOR: javaColor((accent & 0x00ffffff) | 0x33000000),
+          LINK_PRESSED_COLOR: javaColor((accent & 0x00ffffff) | 0x66000000),
+          TITLE_COLOR: javaColor(palette.title),
+          BODY_COLOR: javaColor(palette.body),
+          NOTE_COLOR: javaColor(palette.note),
+          WARN_COLOR: javaColor(palette.warn),
+          CENTER_TEXT: screen.align === "center" ? "true" : "false",
+          ANIMATION_STYLE: String(SCREEN_ANIMATION_CODES[screen.animation]),
         },
         "screenClass",
       ),
@@ -377,7 +623,7 @@ function genUi(ctx: GenContext, javaDir: string, rendererRegistrations: string[]
     const constName = `KEY_${screen.id.toUpperCase()}`;
     const keybindKey = renderTemplate(a.langKeys.keybind!, { namespace: ctx.vars.namespace!, id: screen.id }, "langKeys.keybind");
     const categoryKey = renderTemplate(a.langKeys.keybindCategory!, { namespace: ctx.vars.namespace! }, "langKeys.keybindCategory");
-    const keyCode = renderTemplate(a.keyCodePattern, { KEY: screen.key }, "keyCodePattern");
+    const keyCode = screenKeyCode!;
     out.langEntries[keybindKey] = `Open ${display}`;
     out.langEntries[categoryKey] = ctx.vars.modName!;
     const bindVars = { ...ctx.vars, KEYBIND_CONST: constName, KEY_CODE: keyCode, KEYBIND_LANG_KEY: keybindKey, KEYBIND_CATEGORY_KEY: categoryKey };

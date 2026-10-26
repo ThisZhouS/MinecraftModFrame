@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 1,
+  "mod": {
+    "modId": "examplemod",
+    "name": "UI 2.0 Demo",
+    "version": "1.0.0",
+    "description": "Four linked screens demonstrating UI 2.0–42.0: themes, alignment, animation, wrapping, scrolling, footer and in-body navigation, heading/bullet line styles with section spacing, link hover/tooltips, in-screen anchor jumps with a landing flash, cross-screen deep links that land on a named section, a self link that scrolls back to the top, click sounds, links that commit on release like vanilla buttons (dragging off cancels), keyboard focus navigation across in-body links with focus tooltips that manual scrolling releases, scroll-edge fades that follow the active theme, a fade-out close transition, a layered panel with a footer divider plus full-title tooltips, a muted note style with a quote rule, a scrollbar that keeps its grab offset and maps heading positions as section ticks with the current section highlighted, section ticks that name their section on hover and jump there when clicked, Ctrl+Up/Down jumps between sections with the landing flash, long jumps that stretch the scroll animation (140–280 ms) with distance while wheel and page steps stay at the base pace, page turns that overlap by one line so no sentence is lost between pages, scrollbar track clicks that glide to their spot instead of teleporting (dragging stays immediate), key binds that close an open guide through its fade instead of stacking a second copy, a high-contrast palette for bright scenes, links that visibly deepen while held before committing on release, link hit boxes that match the painted text, a reading position anchored to logical lines across window resizes and screen reopens, footer rows that shrink to a narrow panel instead of spilling past the border, and a contents screen whose bullets are generated from another screen's headings (contentsFor), reusing explicit anchors and synthesizing section_N anchors for the rest, a deep-link tooltip that names the landing section after the screen title, a warm warning line style whose thicker rule keeps cautions apart from plain notes, and ordered step lines whose numbers restart at every heading, plus an in-screen Ctrl+F find bar that matches as you type, cycles its matches on Enter, shows an n/m counter, highlights every matched line while the one Enter would land on reads stronger, closes on Esc before the screen itself, and walks its matches in both directions — Shift+Enter steps back with the same wraparound — with the n/m counter doubling as a pointer control that advances on click and spells both keys out on hover, a find bar that remembers the session across reopenings and lands a fresh query on the first hit at or below the reader's current row instead of always jumping to the document top, and a scrollbar track that maps every active search hit as a tick on the track's outer edge — the cycle’s target drawn bright at double width — so the whole document’s match distribution reads without scrolling. Hovering a hit tick names its matched line and widens it; clicking one jumps straight to that hit and makes it the cycle's target — the ticks sit on a fixed anchor, so widening the track never shifts them. Jump landings keep clear of the find bar while it is open: an open bar shifts the whole body — and the scroll range with it — down past its strip, so every landing row, the document head and Home included, sits fully clear of the bar, and closing it returns the body with the reader’s place held still.",
+    "authors": [
+      "Your Name"
+    ],
+    "license": "MIT"
+  },
+  "target": {
+    "mcVersion": "1.21.1",
+    "loader": "fabric"
+  },
+  "content": {
+    "items": [
+      {
+        "id": "ruby",
+        "name": "Ruby",
+        "group": "ingredients",
+        "texture": {
+          "palette": [
+            "#b91c1c",
+            "#7f1d1d",
+            "#f87171"
+          ],
+          "style": "speckle"
+        },
+        "model": "generated",
+        "behavior": "plain"
+      },
+      {
+        "id": "charged_ruby",
+        "maxCount": 16,
+        "texture": {
+          "palette": [
+            "#b91c1c",
+            "#fbbf24"
+          ],
+          "style": "gradient"
+        },
+        "model": "generated",
+        "behavior": "plain"
+      }
+    ],
+    "blocks": [
+      {
+        "id": "ruby_ore",
+        "hardness": 3,
+        "resistance": 9,
+        "tool": "pickaxe",
+        "texture": {
+          "palette": [
+            "#6b7280",
+            "#dc2626"
+          ],
+          "style": "ore"
+        },
+        "model": "cube_all"
+      },
+      {
+        "id": "deepslate_ruby_ore",
+        "hardness": 4.5,
+        "resistance": 12,
+        "tool": "pickaxe",
+        "texture": {
+          "palette": [
+            "#374151",
+            "#dc2626"
+          ],
+          "style": "ore"
+        },
+        "model": "cube_all"
+      }
+    ],
+    "recipes": [],
+    "entities": [],
+    "advancements": []
+  },
+  "ui": {
+    "screens": [
+      {
+        "id": "guide",
+        "title": "Example Mod Guide",
+        "key": "K",
+        "width": 260,
+        "height": 150,
+        "theme": "dark",
+        "accent": "#11AABB",
+        "align": "left",
+        "animation": "slide",
+        "lines": [
+          {
+            "text": "Welcome",
+            "style": "heading",
+            "anchor": "welcome"
+          },
+          "Press K at any time to open this guide. Scroll with the mouse wheel when the text runs past the panel.",
+          {
+            "text": "Jump to What is generated",
+            "style": "bullet",
+            "target": "#generated"
+          },
+          {
+            "text": "Jump to Try it",
+            "style": "bullet",
+            "target": "#try"
+          },
+          {
+            "text": "What is generated",
+            "style": "heading",
+            "anchor": "generated"
+          },
+          {
+            "text": "Items, blocks, recipes, advancements and entities come from one JSON spec.",
+            "style": "bullet"
+          },
+          {
+            "text": "Screens, themes, animations and navigation come from the same spec.",
+            "style": "bullet"
+          },
+          "This paragraph is deliberately long so the generated screen has to wrap it with the font's own splitter; the wrapped rows and their widths are cached once in init(), and only the rows inside the viewport are drawn, which keeps a twenty-line page as cheap to render as a three-line one.",
+          {
+            "text": "A note reads as secondary text: it is indented, painted in the theme's muted colour and marked by a quote rule, so caveats stay visible without competing with links.",
+            "style": "note"
+          },
+          {
+            "text": "Try it",
+            "style": "heading",
+            "anchor": "try"
+          },
+          {
+            "text": "Open Settings and jump straight to the accent note (cross-screen deep link).",
+            "style": "bullet",
+            "target": "settings#accent"
+          },
+          {
+            "text": "Open Credits for the vanilla theme with a static, non-animated panel.",
+            "style": "bullet",
+            "target": "credits"
+          },
+          "Wrapped continuation rows keep their bullet style and indentation, so a long bullet still reads as one item.",
+          "The scroll bar on the right appears only while the content is taller than the body.",
+          "Buttons are real Minecraft widgets, so hover, keyboard navigation and narration keep working. Press Up or Down to move between in-body links, then Enter to open the focused one.",
+          "Closing the child returns to this screen; closing this screen returns to the game.",
+          "An accent-coloured line is a link: hover to underline it, click to open that screen. Both bullets above are links.",
+          {
+            "text": "Back to top: linking a line to its own screen scrolls this page smoothly to the start.",
+            "style": "bullet",
+            "target": "guide"
+          },
+          {
+            "text": "Add a texture under assets/examplemod/textures/item.",
+            "style": "step"
+          },
+          {
+            "text": "Run ./gradlew build and check the jar in build/libs.",
+            "style": "step"
+          },
+          {
+            "text": "Careful: the generated Java is a build product - regenerating overwrites any hand edits.",
+            "style": "warn"
+          }
+        ],
+        "buttons": [
+          {
+            "action": "open",
+            "target": "contents",
+            "label": "Contents"
+          },
+          {
+            "action": "open",
+            "target": "settings",
+            "label": "Settings"
+          },
+          {
+            "action": "open",
+            "target": "credits",
+            "label": "Credits"
+          },
+          {
+            "action": "close",
+            "label": "Close"
+          }
+        ]
+      },
+      {
+        "id": "contents",
+        "title": "Contents",
+        "width": 220,
+        "height": 140,
+        "theme": "dark",
+        "animation": "fade",
+        "contentsFor": "guide",
+        "lines": [
+          "Every heading in the guide, linked by the generator.",
+          {
+            "text": "Tip: this screen declares no targets; contentsFor builds one bullet per heading, and headings without an anchor get a synthetic one.",
+            "style": "note"
+          }
+        ],
+        "buttons": [
+          {
+            "action": "close",
+            "label": "Back"
+          }
+        ]
+      },
+      {
+        "id": "settings",
+        "title": "Settings",
+        "key": "O",
+        "width": 220,
+        "height": 150,
+        "theme": "light",
+        "align": "center",
+        "animation": "fade",
+        "lines": [
+          {
+            "text": "A centred light panel",
+            "style": "heading"
+          },
+          "A centered light panel with a fade-in.",
+          {
+            "text": "Accents are per screen: #1F6FEB is this theme's default.",
+            "style": "bullet",
+            "anchor": "accent"
+          },
+          {
+            "text": "Tip: notes use a weaker colour than body text, which keeps a hint from reading like an action.",
+            "style": "note"
+          },
+          "Two buttons share the footer row."
+        ],
+        "buttons": [
+          {
+            "action": "open",
+            "target": "guide",
+            "label": "Back to Guide"
+          },
+          {
+            "action": "close",
+            "label": "Done"
+          }
+        ]
+      },
+      {
+        "id": "credits",
+        "title": "Credits",
+        "width": 240,
+        "height": 170,
+        "theme": "contrast",
+        "animation": "none",
+        "lines": [
+          {
+            "text": "About this demo",
+            "style": "heading"
+          },
+          "mcmodkit generated this project from a ModSpec.",
+          {
+            "text": "The same spec produces Fabric, Forge and NeoForge projects.",
+            "style": "bullet"
+          },
+          {
+            "text": "Each adapter owns its Java template, so render order and scroll signatures match the version.",
+            "style": "bullet"
+          },
+          {
+            "text": "A note is still selectable through the same wrapped-row pipeline; only its colour and rule differ.",
+            "style": "note"
+          },
+          "The stage after this one renders one background pass and draws widgets through children().",
+          "That fixes a 1.21 visual defect where the background covered the panel.",
+          "No key opens this screen directly: it is reachable from the guide.",
+          "Press the button below or ESC to go back."
+        ],
+        "buttons": [
+          {
+            "action": "close",
+            "label": "Back"
+          }
+        ]
+      }
+    ]
+  },
+  "datagen": false,
+  "textures": true,
+  "textureProvider": "procedural"
+}

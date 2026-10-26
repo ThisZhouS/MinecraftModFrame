@@ -22,8 +22,10 @@
 | git | 2.53.0.windows.1 | D:\GIT\Git\cmd\git.exe |
 | java | OpenJDK 21.0.11 LTS (Microsoft) | C:\Program Files\Microsoft\jdk-21.0.11.10-hotspot |
 | JAVA_HOME | C:\Program Files\Microsoft\jdk-21.0.11.10-hotspot\ | — |
+| java 17 | OpenJDK 17.0.12 LTS | C:\Program Files\Java\jdk-17（另有 Microsoft 17.0.13 于 C:\Program Files\Microsoft\jdk-17.0.13.11-hotspot） |
+| java 25 | OpenJDK 25.0.4.1 LTS | E:\MCMOD\.tools\jdk-25（临时，不入库；只有 ForgeGradle 7 的 mavenizer 需要） |
 | maven | 3.9.12 | D:\apache-maven\apache-maven-3.9.12\bin\mvn.cmd（本框架预计不用） |
-| gradle | 未安装 | —（mod 模板必须自带 gradle wrapper） |
+| gradle | 未全局安装 | 验收用本地发行版：Gradle 8.8 于 E:\MCMOD\.tools\gradle-8.8，Gradle 9.5.1 于 E:\MCMOD\Temp\tools\gradle-9.5.1（临时，不入库；mod 模板仍必须自带 wrapper） |
 | docker | 未安装 | —（不依赖容器） |
 | vscode | 有 | D:\VSCode\Microsoft VS Code\bin\code.cmd |
 
@@ -34,7 +36,7 @@
 
 ## 对方案的约束 / Constraints derived
 
-1. 本机仅有 **JDK 21**：MC 1.20.5+ / 1.21.x 恰好要求 Java 21，可做**完整编译验证**；MC 1.20.1（Forge/Fabric 需要 Java 17）只能生成项目与代码，编译验证依赖 gradle toolchain 自动下载 JDK 17（需要网络），未验证前一律标注"受限验证"，不得声称已验证。
+1. 本机具备 **JDK 17 / 21 / 25**（2026-10-25 更新；早期只有 JDK 21）：Java 17 目标（1.20.1/1.20.4）与 Java 21 目标（1.20.5+/1.21.x）均可**完整编译验证**；JDK 25 仅用于 ForgeGradle 7 的 mavenizer 工具链，不是任何 mod 的运行目标。构建时按目标把 `--java-home-<17|21>` 指到对应 JDK。
 2. gradle 未全局安装：所有生成的 mod 项目必须**内嵌 gradle wrapper**（gradlew + gradle-wrapper.properties 固定版本），保证脱离本框架仍可构建。
 3. pnpm 可用：采用 pnpm workspace monorepo；构建入口从仓库根目录可复现（`pnpm -r build` / `pnpm test`）。
 4. Windows 路径与 PowerShell：所有脚本必须兼容 Windows（避免 POSIX-only 命令）。
@@ -95,3 +97,44 @@ Get-Command node,npm,pnpm,python,git,java,gradle,mvn,docker | Format-Table Sourc
 | 本机 JDK | JDK 21.0.11 + JDK 17.0.13（`C:\Program Files\Microsoft\`） | Gradle 只通过**注册表**自动探测到 JDK 17；JDK 21 仅作为 **current JVM** 可探测 ⇒ 1.20.4 构建必须让 Gradle 守护进程跑在 JDK 21 上（NFRT 要 21 工具链），否则报 `Cannot find a Java installation ... languageVersion=21` |
 
 工具链使用（临时，位于 `Temp/tools`，不入库）：Gradle 9.5.1 本地发行版（三个 NeoForge 目标共用）。验收产物日志：`Temp/verify-build/<adapter>/build.log` 与 `Temp/verify-runtime/<adapter>/runtime.log`。
+
+## UI 复验环境与命令（2026-10-25 实测）
+
+UI 2.0–42.0 的九目标编译复验使用 `scripts/verify-build.mjs --spec docs/examples/ui2-demo.json`，Gradle 按适配器声明的 `gradleWrapperVersion` 选线。注意 `--java-home-<n>` 的 `n` 是生成工程的 **target.java**（harness 的键名），**不是**运行 Gradle 的 JVM：Fabric 1.20.4（Loom 1.17 插件要求 JVM 21）与 NeoForge 1.20.4（NFRT 21 toolchain 探测）的 target 是 17，但 `--java-home-17` 必须指向 JDK 21。
+
+| 目标群 | Gradle | `--java-home-*` |
+| --- | --- | --- |
+| Fabric 1.21.x | 9.5.1（`E:/MCMOD/Temp/tools/gradle-9.5.1`） | `--java-home-21` = JDK 21 |
+| Fabric 1.20.4 | 9.5.1 | `--java-home-17` = **JDK 21**（Loom 插件不支持 JDK 17 JVM；Java 17 toolchain 由 Gradle 自动探测） |
+| Forge 1.20.1 / 1.20.4 | 8.8（`E:/MCMOD/.tools/gradle-8.8`） | `--java-home-17` = JDK 17 |
+| Forge 1.21.4 | 9.5.1 | `--java-home-21` = JDK 21，另需注册 JDK 25（见下） |
+| NeoForge 1.21.1 / 1.21.4 | 9.5.1 | `--java-home-21` = JDK 21 |
+| NeoForge 1.20.4 | 9.5.1 | `--java-home-17` = **JDK 21**（NFRT 的 21 toolchain 只从运行 Gradle 的 JVM 探测） |
+
+```bash
+# Fabric 1.21.1 与 Forge 1.20.x：一条命令指定两条 Gradle 线
+node scripts/verify-build.mjs --spec docs/examples/ui2-demo.json \
+  --gradle "8=E:/MCMOD/.tools/gradle-8.8/bin/gradle.bat,9=E:/MCMOD/Temp/tools/gradle-9.5.1/bin/gradle.bat" \
+  --java-home-17 "C:/Program Files/Java/jdk-17" \
+  --java-home-21 "C:/Program Files/Microsoft/jdk-21.0.11.10-hotspot" \
+  --adapter fabric-1.21.1
+
+# Forge 1.21.4：ForgeGradle 7 的 mavenizer 跑在 Java 25 工具链上
+node scripts/verify-build.mjs --spec docs/examples/ui2-demo.json \
+  --gradle "9=E:/MCMOD/Temp/tools/gradle-9.5.1/bin/gradle.bat" \
+  --java-home-21 "C:/Program Files/Microsoft/jdk-21.0.11.10-hotspot" \
+  --gradle-arg "-Porg.gradle.java.installations.paths=E:/MCMOD/.tools/jdk-25" \
+  --gradle-arg "-Porg.gradle.java.installations.auto-download=false" \
+  --adapter forge-1.21.4
+
+# NeoForge 1.20.4：target.java 是 17，但 NFRT 的 21 toolchain 只从运行 Gradle 的 JVM 探测
+node scripts/verify-build.mjs --spec docs/examples/ui2-demo.json \
+  --gradle "9=E:/MCMOD/Temp/tools/gradle-9.5.1/bin/gradle.bat" \
+  --java-home-17 "C:/Program Files/Microsoft/jdk-21.0.11.10-hotspot" \
+  --adapter neoforge-1.20.4
+```
+
+- 两个 `-Porg.gradle.java.installations.*` 必须**各占一个 argv**（Git Bash 下用双引号包住）：只注册 JDK 25 而不关自动下载，foojay resolver 仍会在 `~/.gradle/jdks` 拉半截 JDK 25 压缩包，表现为构建长时间停滞。
+- `fabric-1.20.4` 若让 Gradle 跑在 JDK 17 上，会在配置期报 `Dependency requires at least JVM runtime version 21`（Loom 1.17 插件自身要求）：把 `--java-home-17` 指向 JDK 21 即可，生成工程的 Java 17 toolchain 会由 Gradle 自动探测。
+- FG7 首次成功构建后，旧工程里的 `.gradle/mavenizer`（约 47 MB）可直接复制到同目标的新验证工程，省去重新解析 Minecraft maven。
+- 复验结束看每个目标的 `Temp/verify-build/<adapter>/build.log` 末行 `BUILD SUCCESSFUL`，并核对 jar 内 `com/verifyfabric|verifyforge/client/` 下的 Screen 类与 mod 元数据。
